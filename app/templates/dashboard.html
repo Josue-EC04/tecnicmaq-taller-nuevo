@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h2 class="fw-bold text-dark">Panel de Control</h2>
+        <p class="text-muted">Resumen del estado actual del taller.</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <span class="badge bg-light text-dark border p-2">
+            📅 Fecha: <span id="fecha-actual"></span>
+        </span>
+    </div>
+</div>
+
+<div class="row mb-4">
+    
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Total Repuestos</div>
+                <div class="display-5 fw-bold text-dark">{{ total_tipos }}</div>
+                <small class="text-muted">Tipos registrados</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Valor Inventario</div>
+                <div class="display-6 fw-bold text-success">${{ "{:,.2f}".format(valor_inventario) }}</div>
+                <small class="text-muted">Capital en stock</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Reservas Activas</div>
+                <div class="display-5 fw-bold text-dark">{{ total_reservas }}</div>
+                <a href="/reservas" class="text-decoration-none small text-warning stretched-link">Ver pendientes &rarr;</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
+            <div class="card-body">
+                <div class="text-danger small text-uppercase fw-bold">⚠️ Stock Crítico</div>
+                <div class="display-5 fw-bold text-danger">{{ alertas_stock }}</div>
+                <small class="text-muted">Productos con < 5 unidades</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow border-0 h-100">
+            <div class="card-header bg-white fw-bold">⚡ Accesos Rápidos</div>
+            <div class="card-body d-grid gap-3">
+                <a href="/agregar" class="btn btn-outline-primary btn-lg text-start shadow-sm">
+                    <span class="fs-4 me-2">+</span> Registrar Nuevo Repuesto
+                </a>
+                <a href="/inventario" class="btn btn-outline-dark btn-lg text-start shadow-sm">
+                    <span class="fs-4 me-2">🔍</span> Buscar en Inventario
+                </a>
+                <button class="btn btn-light btn-lg text-start text-muted border" disabled>
+                    <span class="fs-4 me-2">📊</span> Reporte de Ventas (Próximamente)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card shadow border-0 h-100 bg-dark text-white" 
+            style="background: linear-gradient(45deg, #1a1a1a, #2c3e50);">
+            <div class="card-body d-flex flex-column justify-content-center align-items-center text-center p-5">
+                
+                <img src="{{ url_for('static', filename='img/logo.png') }}" 
+                    alt="Logo" class="img-fluid mb-3 rounded" style="max-height: 100px;">
+                <h3>Sistema de Gestión</h3>
+                <p class="text-white-50">Tecnicmaq ECK - Ingeniería Técnica</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('fecha-actual').innerText = new Date().toLocaleDateString('es-ES', opciones);
+</script>
+
+{% endblock %}
