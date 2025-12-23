@@ -5,19 +5,21 @@ from werkzeug.security import generate_password_hash
 app = create_app()
 
 with app.app_context():
-    # 1. Borramos usuarios viejos si existen (opcional, para limpiar)
+    # 1. ¡IMPORTANTE! Crear las tablas si no existen
+    db.create_all()
+    
+    # 2. Limpiar usuarios anteriores (para reiniciar el admin siempre)
     db.session.query(Usuario).delete()
     
-    # 2. Datos del Admin
+    # 3. Datos del Admin
     usuario = "admin"
-    password_plano = "tecnicmaqeck4411" # <--- CAMBIA ESTO POR TU CONTRASEÑA REAL
+    password_plano = "tecnicmaqeck4411" 
     
-    # 3. Encriptamos la contraseña (Seguridad total)
+    # 4. Encriptar y Guardar
     password_segura = generate_password_hash(password_plano)
-    
-    # 4. Creamos y guardamos
     nuevo_admin = Usuario(nombre="Administrador", username=usuario, password=password_segura)
+    
     db.session.add(nuevo_admin)
     db.session.commit()
     
-    print(f"✅ Usuario '{usuario}' creado con éxito.")
+    print(f"✅ Tablas creadas y usuario '{usuario}' configurado con éxito.")
