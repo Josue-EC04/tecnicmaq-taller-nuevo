@@ -10,7 +10,7 @@
     <div class="card bg-success text-white shadow-sm">
         <div class="card-body py-2 px-4 text-center">
             <span class="small text-uppercase fw-bold opacity-75">Ganancia Histórica</span>
-            <div class="h3 fw-bold mb-0">${{ "%.2f"|format(total_ganancia_global) }}</div>
+            <div class="h3 fw-bold mb-0">S/{{ "%.2f"|format(total_ganancia_global) }}</div>
         </div>
     </div>
 </div>
@@ -35,11 +35,11 @@
                     <div class="d-flex gap-3 text-end">
                         <div class="d-none d-md-block">
                             <small class="text-muted d-block">Ingresos</small>
-                            <span class="fw-bold text-dark">${{ "%.2f"|format(datos.suma_ingresos) }}</span>
+                            <span class="fw-bold text-dark">S/{{ "%.2f"|format(datos.suma_ingresos) }}</span>
                         </div>
                         <div>
                             <small class="text-success d-block fw-bold">Ganancia Neta</small>
-                            <span class="badge bg-success fs-6">+ ${{ "%.2f"|format(datos.suma_ganancia) }}</span>
+                            <span class="badge bg-success fs-6">+ S/{{ "%.2f"|format(datos.suma_ganancia) }}</span>
                         </div>
                     </div>
                 </div>
@@ -76,10 +76,10 @@
                                 <td class="text-center">
                                     <span class="badge bg-light text-dark border">{{ venta.cantidad }}</span>
                                 </td>
-                                <td>${{ venta.precio_unitario }}</td>
-                                <td class="fw-bold">${{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</td>
+                                <td>S/{{ venta.precio_unitario }}</td>
+                                <td class="fw-bold">S/{{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</td>
                                 <td class="text-success fw-bold text-end">
-                                    + ${{ "%.2f"|format(venta.ganancia_total) }}
+                                    + S/{{ "%.2f"|format(venta.ganancia_total) }}
                                 </td>
                                 <td>
                                     <form action="{{ url_for('main.eliminar_venta', id=venta.id) }}" method="POST" style="display:inline;">

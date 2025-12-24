@@ -209,7 +209,7 @@ def vender_producto(id):
         db.session.add(nueva_venta)
         db.session.commit()
         
-        flash(f'¡Venta registrada! Ingreso: ${total_pagar} | Ganancia: ${ganancia}', 'success')
+        flash(f'¡Venta registrada! Ingreso: S/{total_pagar} | Ganancia: S/{ganancia}', 'success')
         return redirect(url_for('main.inventario'))
         
     return render_template('form_venta.html', repuesto=repuesto)

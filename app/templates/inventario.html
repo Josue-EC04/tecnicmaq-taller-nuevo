@@ -126,14 +126,14 @@
                             {% endif %}
                         </td>
                         
-                        <td class="text-muted small">${{ repuesto.costo }}</td>
+                        <td class="text-muted small">S/{{ repuesto.costo }}</td>
                         
-                        <td class="fw-bold text-success fs-5">${{ repuesto.precio }}</td>
+                        <td class="fw-bold text-success fs-5">S/{{ repuesto.precio }}</td>
                         
                         <td>
                             {% set margen = repuesto.precio - repuesto.costo %}
                             <span class="badge bg-light text-dark border border-secondary">
-                                + ${{ "%.2f"|format(margen) }}
+                                + S/{{ "%.2f"|format(margen) }}
                             </span>
                         </td>
 
