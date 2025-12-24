@@ -504,7 +504,7 @@ def chatbot_responde():
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-2.5-flash') 
 
-    # --- PROMPT MEJORADO (CEREBRO ANALÍTICO) ---
+    # --- PROMPT CORREGIDO (PARA QUE NO DIGA "CHARLA") ---
     instruccion_sistema = f"""
     Eres el asistente inteligente de 'Tecnicmaq'.
     
@@ -513,24 +513,24 @@ def chatbot_responde():
     
     USUARIO: "{mensaje_usuario}"
 
-    TU MISIÓN: Clasificar la intención y responder con UN COMANDO EXACTO.
+    TU MISIÓN:
+    - Si el usuario pide una acción de inventario, responde con un COMANDO EXACTO.
+    - Si el usuario saluda o conversa, RESPONDE NATURALMENTE (No uses comandos ni etiquetas).
 
     REGLAS DE COMANDOS:
     
-    1. ANÁLISIS Y ESTADÍSTICAS (Los "Más" y los "Menos"):
-       - Si piden "el mas caro", "el mas barato", "el que mas stock tiene", "el de menos cantidad".
+    1. ANÁLISIS (Los "Más" y los "Menos"):
+       - Piden: "el mas caro", "el mas barato", "el que mas stock tiene".
        - RESPONDE: COMANDO_ANALISIS|CLAVE
-       - Claves validas: MAX_STOCK, MIN_STOCK, MAX_PRECIO, MIN_PRECIO
+       - Claves: MAX_STOCK, MIN_STOCK, MAX_PRECIO, MIN_PRECIO
     
     2. BÚSQUEDA ESPECÍFICA:
-       - Si buscan algo por nombre, marca o condiciones especificas como "stock 0", "agotados".
+       - Piden nombre, marca o condiciones ("stock 0", "agotados").
        - RESPONDE: COMANDO_BUSCAR|termino
     
     3. CREAR:
+       - Piden agregar algo.
        - RESPONDE: COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK
-    
-    4. CHARLA:
-       - Responde como humano amable.
     """
 
     try:
@@ -538,21 +538,17 @@ def chatbot_responde():
         respuesta_ia = response.text.strip()
         respuesta_final = ""
 
-        # --- LÓGICA DE ANÁLISIS (LO NUEVO) ---
+        # --- LÓGICA DE ANÁLISIS ---
         if "COMANDO_ANALISIS|" in respuesta_ia:
             clave = respuesta_ia.replace("COMANDO_ANALISIS|", "").strip()
-            
-            # Consultas especiales de ordenamiento
             query = Repuesto.query
             resultados = []
             msg_tipo = ""
 
             if clave == 'MAX_STOCK':
-                # Traemos los 3 con más stock
                 resultados = query.order_by(Repuesto.cantidad.desc()).limit(3).all()
                 msg_tipo = "con MÁS stock"
             elif clave == 'MIN_STOCK':
-                # Traemos los 3 con menos stock
                 resultados = query.order_by(Repuesto.cantidad.asc()).limit(3).all()
                 msg_tipo = "con MENOS stock"
             elif clave == 'MAX_PRECIO':
@@ -569,12 +565,11 @@ def chatbot_responde():
             else:
                 respuesta_final = "El inventario está vacío."
 
-        # --- LÓGICA DE BÚSQUEDA (CON TU LÓGICA DE '0 y 1') ---
+        # --- LÓGICA DE BÚSQUEDA ---
         elif "COMANDO_BUSCAR|" in respuesta_ia:
             termino = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip().lower()
             query = Repuesto.query
             
-            # Tu lógica especial para stock bajo
             if "stock 0" in termino or "agotado" in termino:
                 resultados = query.filter(Repuesto.cantidad == 0).all()
                 desc = "agotados (Stock 0)"
@@ -582,7 +577,6 @@ def chatbot_responde():
                 resultados = query.filter(Repuesto.cantidad <= 1).all()
                 desc = "con stock crítico (0 o 1)"
             else:
-                # Búsqueda normal por texto
                 resultados = query.filter(
                     (Repuesto.nombre.ilike(f'%{termino}%')) | 
                     (Repuesto.codigo.ilike(f'%{termino}%')) |
@@ -597,7 +591,7 @@ def chatbot_responde():
             else:
                 respuesta_final = f"❌ No encontré nada {desc}."
 
-        # --- LÓGICA DE CREAR (Igual que antes) ---
+        # --- LÓGICA DE CREAR ---
         elif "COMANDO_CREAR|" in respuesta_ia:
             datos = respuesta_ia.replace("COMANDO_CREAR|", "").split('|')
             if len(datos) >= 4:
@@ -612,6 +606,7 @@ def chatbot_responde():
             else:
                 respuesta_final = "⚠️ Faltan datos para crear."
 
+        # --- CHARLA NORMAL (Si no es ningún comando, mostramos lo que diga la IA) ---
         else:
             respuesta_final = respuesta_ia
 
