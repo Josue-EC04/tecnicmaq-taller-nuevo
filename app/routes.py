@@ -502,7 +502,8 @@ def chatbot_responde():
         return jsonify({'respuesta': '⚠️ Error: Falta API Key.'})
     
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash') 
+    # Buscamos la línea del modelo (aprox línea 500) y ponemos esto:
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
     # --- PROMPT CORREGIDO (PARA QUE NO DIGA "CHARLA") ---
     instruccion_sistema = f"""
@@ -619,4 +620,4 @@ def chatbot_responde():
 
     except Exception as e:
         print(f"Error: {e}")
-        return jsonify({'respuesta': "😵 Hubo un error técnico."})
+        return jsonify({'respuesta': "😵 Tuve un pequeño error de conexión. Intenta preguntarme de nuevo."})
