@@ -7,11 +7,12 @@ from datetime import datetime
 from collections import defaultdict
 
 # Agrupamos todo lo de Flask en una línea para no olvidarnos nada
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, make_response, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, make_response, jsonify, session
 
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import login_user, logout_user, login_required, current_user
+
 
 # Tus modelos
 from .models import Repuesto, Reserva, Usuario, Venta, db
@@ -489,95 +490,138 @@ def chatbot_responde():
     data = request.get_json()
     mensaje_usuario = data.get('mensaje', '')
     
-    # 1. Verificamos la API Key
+    # --- MEMORIA DEL CHAT ---
+    historial = session.get('historial_chat', [])
+    contexto_previo = ""
+    for msg in historial:
+        contexto_previo += f"- {msg['role']}: {msg['text']}\n"
+
+    # --- CONFIGURACIÓN ---
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
-        return jsonify({'respuesta': '⚠️ Error: No configuraste la GEMINI_API_KEY en el .env o en Render.'})
+        return jsonify({'respuesta': '⚠️ Error: Falta API Key.'})
     
-    # 2. Configuramos Gemini
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash') # Modelo rápido y ligero
+    model = genai.GenerativeModel('gemini-2.5-flash') 
 
-    # 3. El PROMPT DEL SISTEMA (Las "instrucciones secretas" para la IA)
+    # --- PROMPT MEJORADO (CEREBRO ANALÍTICO) ---
     instruccion_sistema = f"""
-    Eres el asistente del taller 'Tecnicmaq'. Tu misión es interpretar lo que dice el usuario y responder con ACCIONES DE BASE DE DATOS o conversación normal.
-
-    TUS REGLAS OBLIGATORIAS:
+    Eres el asistente inteligente de 'Tecnicmaq'.
     
-    CASO 1: Si el usuario quiere CREAR, AGREGAR o INGRESAR un repuesto:
-    - Debes extraer: Codigo, Nombre, Precio, Stock.
-    - Si falta el Código, inventa uno corto (ej: GEN-01). Si falta Stock, pon 1.
-    - RESPONDE SOLO CON ESTE FORMATO EXACTO: 
-      COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK
+    HISTORIAL:
+    {contexto_previo}
     
-    CASO 2: Si el usuario quiere BUSCAR o SABER SI HAY algo:
-    - Extrae la palabra clave principal.
-    - RESPONDE SOLO CON ESTE FORMATO EXACTO: 
-      COMANDO_BUSCAR|PALABRA_CLAVE
+    USUARIO: "{mensaje_usuario}"
 
-    CASO 3: Si es saludo o charla:
-    - Responde amable y corto. No uses formatos raros.
+    TU MISIÓN: Clasificar la intención y responder con UN COMANDO EXACTO.
 
-    Mensaje del usuario: "{mensaje_usuario}"
+    REGLAS DE COMANDOS:
+    
+    1. ANÁLISIS Y ESTADÍSTICAS (Los "Más" y los "Menos"):
+       - Si piden "el mas caro", "el mas barato", "el que mas stock tiene", "el de menos cantidad".
+       - RESPONDE: COMANDO_ANALISIS|CLAVE
+       - Claves validas: MAX_STOCK, MIN_STOCK, MAX_PRECIO, MIN_PRECIO
+    
+    2. BÚSQUEDA ESPECÍFICA:
+       - Si buscan algo por nombre, marca o condiciones especificas como "stock 0", "agotados".
+       - RESPONDE: COMANDO_BUSCAR|termino
+    
+    3. CREAR:
+       - RESPONDE: COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK
+    
+    4. CHARLA:
+       - Responde como humano amable.
     """
 
     try:
-        # 4. Enviamos el mensaje a Google
         response = model.generate_content(instruccion_sistema)
         respuesta_ia = response.text.strip()
+        respuesta_final = ""
 
-        # 5. Interpretamos la respuesta de la IA
-        
-        # --- CASO A: CREAR ---
-        if "COMANDO_CREAR|" in respuesta_ia:
-            # Limpiamos el texto por si la IA agregó comillas o espacios
-            datos_raw = respuesta_ia.replace("COMANDO_CREAR|", "").strip()
-            datos = datos_raw.split('|')
+        # --- LÓGICA DE ANÁLISIS (LO NUEVO) ---
+        if "COMANDO_ANALISIS|" in respuesta_ia:
+            clave = respuesta_ia.replace("COMANDO_ANALISIS|", "").strip()
             
-            # Datos extraídos por la IA
-            codigo_ia = datos[0]
-            nombre_ia = datos[1]
-            precio_ia = float(datos[2])
-            stock_ia = int(datos[3])
+            # Consultas especiales de ordenamiento
+            query = Repuesto.query
+            resultados = []
+            msg_tipo = ""
 
-            # Creamos en la Base de Datos
-            nuevo = Repuesto(
-                codigo=codigo_ia,
-                nombre=nombre_ia,
-                marca="Generico", # La IA podría extraer esto también, pero simplificamos
-                cantidad=stock_ia,
-                costo=precio_ia * 0.7, # Calculamos costo automático (70% del precio)
-                precio=precio_ia,
-                imagen_filename='default.jpg'
-            )
-            db.session.add(nuevo)
-            db.session.commit()
-            
-            return jsonify({'respuesta': f"✅ ¡Listo! Agregué '{nombre_ia}' (Stock: {stock_ia}) a S/{precio_ia}."})
-
-        # --- CASO B: BUSCAR ---
-        elif "COMANDO_BUSCAR|" in respuesta_ia:
-            termino = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip()
-            
-            # Buscamos en tu DB
-            resultados = Repuesto.query.filter(
-                (Repuesto.nombre.ilike(f'%{termino}%')) | 
-                (Repuesto.codigo.ilike(f'%{termino}%')) |
-                (Repuesto.marca.ilike(f'%{termino}%'))
-            ).all()
+            if clave == 'MAX_STOCK':
+                # Traemos los 3 con más stock
+                resultados = query.order_by(Repuesto.cantidad.desc()).limit(3).all()
+                msg_tipo = "con MÁS stock"
+            elif clave == 'MIN_STOCK':
+                # Traemos los 3 con menos stock
+                resultados = query.order_by(Repuesto.cantidad.asc()).limit(3).all()
+                msg_tipo = "con MENOS stock"
+            elif clave == 'MAX_PRECIO':
+                resultados = query.order_by(Repuesto.precio.desc()).limit(3).all()
+                msg_tipo = "más CAROS"
+            elif clave == 'MIN_PRECIO':
+                resultados = query.order_by(Repuesto.precio.asc()).limit(3).all()
+                msg_tipo = "más BARATOS"
 
             if resultados:
-                texto_resp = f"🔍 Esto encontré para '{termino}':\n"
+                respuesta_final = f"📊 Top 3 productos {msg_tipo}:\n"
                 for r in resultados:
-                    texto_resp += f"• {r.nombre} | Stock: {r.cantidad} | S/{r.precio}\n"
-                return jsonify({'respuesta': texto_resp})
+                    respuesta_final += f"🥇 {r.nombre} | Stock: {r.cantidad} | S/{r.precio}\n"
             else:
-                return jsonify({'respuesta': f"❌ No encontré nada sobre '{termino}' en el inventario."})
+                respuesta_final = "El inventario está vacío."
 
-        # --- CASO C: CHARLA NORMAL ---
+        # --- LÓGICA DE BÚSQUEDA (CON TU LÓGICA DE '0 y 1') ---
+        elif "COMANDO_BUSCAR|" in respuesta_ia:
+            termino = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip().lower()
+            query = Repuesto.query
+            
+            # Tu lógica especial para stock bajo
+            if "stock 0" in termino or "agotado" in termino:
+                resultados = query.filter(Repuesto.cantidad == 0).all()
+                desc = "agotados (Stock 0)"
+            elif "stock 1" in termino or "stock 0 y 1" in termino:
+                resultados = query.filter(Repuesto.cantidad <= 1).all()
+                desc = "con stock crítico (0 o 1)"
+            else:
+                # Búsqueda normal por texto
+                resultados = query.filter(
+                    (Repuesto.nombre.ilike(f'%{termino}%')) | 
+                    (Repuesto.codigo.ilike(f'%{termino}%')) |
+                    (Repuesto.marca.ilike(f'%{termino}%'))
+                ).all()
+                desc = f"para '{termino}'"
+
+            if resultados:
+                respuesta_final = f"🔍 Encontré estos productos {desc}:\n"
+                for r in resultados:
+                    respuesta_final += f"• {r.nombre} ({r.marca}) | Stock: {r.cantidad} | S/{r.precio}\n"
+            else:
+                respuesta_final = f"❌ No encontré nada {desc}."
+
+        # --- LÓGICA DE CREAR (Igual que antes) ---
+        elif "COMANDO_CREAR|" in respuesta_ia:
+            datos = respuesta_ia.replace("COMANDO_CREAR|", "").split('|')
+            if len(datos) >= 4:
+                nuevo = Repuesto(
+                    codigo=datos[0], nombre=datos[1], precio=float(datos[2]),
+                    cantidad=int(datos[3]), marca="Generico", costo=float(datos[2])*0.7,
+                    imagen_filename='default.jpg'
+                )
+                db.session.add(nuevo)
+                db.session.commit()
+                respuesta_final = f"✅ Agregado: {datos[1]} a S/{datos[2]} (Stock: {datos[3]})"
+            else:
+                respuesta_final = "⚠️ Faltan datos para crear."
+
         else:
-            return jsonify({'respuesta': respuesta_ia})
+            respuesta_final = respuesta_ia
+
+        # Guardar historial
+        historial.append({"role": "Usuario", "text": mensaje_usuario})
+        historial.append({"role": "Bot", "text": respuesta_final})
+        session['historial_chat'] = historial[-6:] 
+
+        return jsonify({'respuesta': respuesta_final})
 
     except Exception as e:
-        print(f"Error Gemini: {e}")
-        return jsonify({'respuesta': "😵 Mi cerebro de IA se mareó. Intenta escribirlo de otra forma."})
+        print(f"Error: {e}")
+        return jsonify({'respuesta': "😵 Hubo un error técnico."})
