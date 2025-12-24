@@ -6,7 +6,9 @@ from .models import Repuesto, db
 from .models import Repuesto, Reserva, db
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from .models import Repuesto, Reserva, Usuario, db
+from .models import Repuesto, Reserva, Usuario, Venta, db
+from collections import defaultdict
+from datetime import datetime
 
 # Creamos el Blueprint
 main = Blueprint('main', __name__)
@@ -102,6 +104,7 @@ def agregar():
         nombre = request.form.get('nombre')
         marca = request.form.get('marca')
         cantidad = request.form.get('cantidad')
+        costo = request.form.get('costo')
         precio = request.form.get('precio')
         
         # Procesar imagen
@@ -122,6 +125,7 @@ def agregar():
             nombre=nombre,
             marca=marca,
             cantidad=int(cantidad),
+            costo=float(costo),
             precio=float(precio),
             imagen_filename=filename
         )
@@ -138,18 +142,29 @@ def agregar():
 @login_required
 def editar(id):
     repuesto = Repuesto.query.get_or_404(id)
-
+    
     if request.method == 'POST':
+        repuesto.codigo = request.form.get('codigo')
         repuesto.nombre = request.form.get('nombre')
         repuesto.marca = request.form.get('marca')
-        # CORRECCIÓN: Convertimos a números para evitar errores
         repuesto.cantidad = int(request.form.get('cantidad'))
+        
+        # --- AQUÍ ACTUALIZAMOS LOS PRECIOS ---
+        repuesto.costo = float(request.form.get('costo'))
         repuesto.precio = float(request.form.get('precio'))
+        # -------------------------------------
 
+        # Lógica de imagen (se mantiene igual)
+        imagen = request.files.get('imagen')
+        if imagen and imagen.filename != '':
+            filename = secrets.token_hex(8) + "_" + imagen.filename
+            imagen.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
+            repuesto.imagen_filename = filename
+            
         db.session.commit()
-        flash('¡Repuesto actualizado correctamente!', 'success')
+        flash('Repuesto actualizado correctamente', 'success')
         return redirect(url_for('main.inventario'))
-
+        
     return render_template('editar.html', repuesto=repuesto)
 
 @main.route('/eliminar/<int:id>')
@@ -161,20 +176,43 @@ def eliminar(id):
     flash('Repuesto eliminado.', 'warning')
     return redirect(url_for('main.inventario'))
 
-@main.route('/vender/<int:id>')
+@main.route('/vender/<int:id>', methods=['GET', 'POST'])
 @login_required
-def vender(id):
+def vender_producto(id):
     repuesto = Repuesto.query.get_or_404(id)
     
-    if repuesto.cantidad > 0:
-        repuesto.cantidad -= 1
-        db.session.commit()
-        flash(f'¡Venta registrada! Quedan {repuesto.cantidad} unidades.', 'success')
-    else:
-        flash(f'¡Error! No hay stock disponible.', 'danger')
+    if request.method == 'POST':
+        cantidad = int(request.form.get('cantidad'))
         
-    return redirect(url_for('main.inventario'))
-
+        # 1. Validar Stock
+        if cantidad > repuesto.cantidad:
+            flash('Error: No hay suficiente stock para esa venta.', 'danger')
+            return redirect(url_for('main.vender_producto', id=id))
+            
+        # 2. Calcular los dineros
+        total_pagar = repuesto.precio * cantidad
+        ganancia = (repuesto.precio - repuesto.costo) * cantidad
+        
+        # 3. RESTAR STOCK
+        repuesto.cantidad -= cantidad
+        
+        # 4. GUARDAR EN EL HISTORIAL (La parte nueva)
+        nueva_venta = Venta(
+            cantidad=cantidad,
+            precio_unitario=repuesto.precio,
+            costo_unitario=repuesto.costo,
+            ganancia_total=ganancia,
+            repuesto_nombre=repuesto.nombre, # Guardamos nombre por si luego borras el producto
+            repuesto_codigo=repuesto.codigo
+        )
+        
+        db.session.add(nueva_venta)
+        db.session.commit()
+        
+        flash(f'¡Venta registrada! Ingreso: ${total_pagar} | Ganancia: ${ganancia}', 'success')
+        return redirect(url_for('main.inventario'))
+        
+    return render_template('form_venta.html', repuesto=repuesto)
 # 1. RUTA PARA VER TODAS LAS RESERVAS
 @main.route('/reservas')
 @login_required
@@ -238,3 +276,49 @@ def gestion_reserva(id, accion):
         flash('Reserva cancelada. Stock devuelto al inventario.', 'warning')
         
     return redirect(url_for('main.lista_reservas'))
+
+@main.route('/historial-ventas')
+@login_required
+def historial_ventas():
+    # 1. Traemos todas las ventas ordenadas por fecha (la más reciente primero)
+    ventas = Venta.query.order_by(Venta.fecha.desc()).all()
+    
+    # 2. Diccionario para traducir meses a español (Python lo da en inglés)
+    nombres_meses = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 
+        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto', 
+        9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+    }
+
+    # 3. Estructura para agrupar: 
+    # Clave: "Diciembre 2025" -> Valor: {lista_ventas, total_ganancia, total_ingreso}
+    historial_agrupado = {}
+
+    for venta in ventas:
+        # Creamos una clave única: "Mes Año" (Ej: Diciembre 2025)
+        mes_nombre = nombres_meses[venta.fecha.month]
+        anio = venta.fecha.year
+        clave_periodo = f"{mes_nombre} {anio}"
+        
+        # Si es la primera vez que vemos este mes, inicializamos sus datos
+        if clave_periodo not in historial_agrupado:
+            historial_agrupado[clave_periodo] = {
+                'ventas': [],
+                'suma_ingresos': 0,
+                'suma_ganancia': 0
+            }
+        
+        # Agregamos la venta a ese mes
+        historial_agrupado[clave_periodo]['ventas'].append(venta)
+        
+        # Sumamos a los totales de ese mes
+        ingreso_venta = venta.precio_unitario * venta.cantidad
+        historial_agrupado[clave_periodo]['suma_ingresos'] += ingreso_venta
+        historial_agrupado[clave_periodo]['suma_ganancia'] += venta.ganancia_total
+
+    # 4. Total histórico global (de todos los tiempos)
+    total_ganancia_global = sum(v.ganancia_total for v in ventas)
+    
+    return render_template('reporte_ventas.html', 
+                           historial_agrupado=historial_agrupado, 
+                           total_ganancia_global=total_ganancia_global)

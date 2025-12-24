@@ -24,6 +24,7 @@
                 <ul class="navbar-nav ms-auto fw-bold"> {% if current_user.is_authenticated %}
                         <li class="nav-item"><a class="nav-link" href="/inventario">Inventario</a></li>
                         <li class="nav-item"><a class="nav-link" href="/reservas">Reservas</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/historial-ventas">Reportes</a></li>
                         <li class="nav-item d-flex align-items-center ms-3">
                             <span class="text-secondary me-2">Hola, {{ current_user.nombre }}</span>
                             <a class="btn btn-outline-danger btn-sm" href="/logout">Salir</a>

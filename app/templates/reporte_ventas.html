@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold">📊 Reporte Mensual de Ventas</h2>
+        <p class="text-muted">Despliega cada mes para ver el detalle.</p>
+    </div>
+    
+    <div class="card bg-success text-white shadow-sm">
+        <div class="card-body py-2 px-4 text-center">
+            <span class="small text-uppercase fw-bold opacity-75">Ganancia Histórica</span>
+            <div class="h3 fw-bold mb-0">${{ "%.2f"|format(total_ganancia_global) }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="accordion shadow-sm" id="accordionVentas">
+    
+    {% for periodo, datos in historial_agrupado.items() %}
+    <div class="accordion-item border-0 mb-3 shadow-sm rounded overflow-hidden">
+        
+        <h2 class="accordion-header" id="heading{{ loop.index }}">
+            <button class="accordion-button {% if not loop.first %}collapsed{% endif %} bg-light" 
+                    type="button" 
+                    data-bs-toggle="collapse" 
+                    data-bs-target="#collapse{{ loop.index }}" 
+                    aria-expanded="{{ 'true' if loop.first else 'false' }}">
+                
+                <div class="d-flex w-100 justify-content-between align-items-center me-3">
+                    <div class="fw-bold fs-5 text-dark">
+                        📅 {{ periodo }}
+                    </div>
+                    
+                    <div class="d-flex gap-3 text-end">
+                        <div class="d-none d-md-block">
+                            <small class="text-muted d-block">Ingresos</small>
+                            <span class="fw-bold text-dark">${{ "%.2f"|format(datos.suma_ingresos) }}</span>
+                        </div>
+                        <div>
+                            <small class="text-success d-block fw-bold">Ganancia Neta</small>
+                            <span class="badge bg-success fs-6">+ ${{ "%.2f"|format(datos.suma_ganancia) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+            </button>
+        </h2>
+
+        <div id="collapse{{ loop.index }}" 
+             class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+             data-bs-parent="#accordionVentas">
+            
+            <div class="accordion-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 align-middle">
+                        <thead class="table-dark small">
+                            <tr>
+                                <th>Fecha Hora</th>
+                                <th>Producto</th>
+                                <th class="text-center">Cant.</th>
+                                <th>Precio Unit.</th>
+                                <th>Total Venta</th>
+                                <th class="text-success text-end">Ganancia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for venta in datos.ventas %}
+                            <tr>
+                                <td class="small">{{ venta.fecha.strftime('%d/%m %H:%M') }}</td>
+                                <td>
+                                    <div class="fw-bold">{{ venta.repuesto_nombre }}</div>
+                                    <small class="text-muted">{{ venta.repuesto_codigo }}</small>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border">{{ venta.cantidad }}</span>
+                                </td>
+                                <td>${{ venta.precio_unitario }}</td>
+                                <td class="fw-bold">${{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</td>
+                                <td class="text-success fw-bold text-end">
+                                    + ${{ "%.2f"|format(venta.ganancia_total) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+        <div class="alert alert-info text-center">
+            📭 Aún no hay ventas registradas en el sistema.
+        </div>
+    {% endfor %}
+
+</div>
+{% endblock %}

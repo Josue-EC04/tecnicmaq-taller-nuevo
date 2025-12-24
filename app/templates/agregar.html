@@ -4,40 +4,55 @@
 <div class="row justify-content-center">
     <div class="col-md-6">
         <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Registrar Nuevo Repuesto</h4>
+            <div class="card-header bg-success text-white"> <h4 class="mb-0">Registrar Nuevo Repuesto</h4>
             </div>
             <div class="card-body">
                 <form method="POST" action="/agregar" enctype="multipart/form-data">
+                    
                     <div class="mb-3">
-                        <label class="form-label">Código (Único)</label>
-                        <input type="text" name="codigo" class="form-control" placeholder="Ej: FIL-002" required>
+                        <label class="form-label fw-bold">Código (Único)</label>
+                        <input type="text" name="codigo" class="form-control" placeholder="Ej: FIL-002" required autofocus>
                     </div>
+
                     <div class="mb-3">
                         <label class="form-label">Imagen del Repuesto</label>
                         <input type="file" name="imagen" class="form-control" accept="image/*">
                         <div class="form-text">Formatos permitidos: JPG, PNG.</div>
                     </div>
+
                     <div class="mb-3">
-                        <label class="form-label">Nombre del Repuesto</label>
+                        <label class="form-label fw-bold">Nombre del Repuesto</label>
                         <input type="text" name="nombre" class="form-control" placeholder="Ej: Pastillas de Freno" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Marca</label>
-                        <input type="text" name="marca" class="form-control" placeholder="Ej: Toyota">
-                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Cantidad Inicial</label>
-                            <input type="number" name="cantidad" class="form-control" value="1" min="0" required>
+                            <label class="form-label">Marca</label>
+                            <input type="text" name="marca" class="form-control" placeholder="Ej: Toyota">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Precio ($)</label>
-                            <input type="number" step="0.01" name="precio" class="form-control" placeholder="0.00" required>
+                            <label class="form-label fw-bold">Cantidad Inicial (Stock)</label>
+                            <input type="number" name="cantidad" class="form-control" value="1" min="1" required>
                         </div>
                     </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-secondary">Costo de Compra ($)</label>
+                            <input type="number" step="0.01" name="costo" class="form-control" placeholder="0.00" required>
+                            <div class="form-text small">Lo que pagaste al proveedor.</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-success">Precio de Venta ($)</label>
+                            <input type="number" step="0.01" name="precio" class="form-control" placeholder="0.00" required>
+                            <div class="form-text small">Precio al público.</div>
+                        </div>
+                    </div>
+
+                    <hr>
+
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success">Guardar Repuesto</button>
+                        <button type="submit" class="btn btn-success btn-lg">Guardar Repuesto</button>
                         <a href="/inventario" class="btn btn-secondary">Cancelar</a>
                     </div>
                 </form>
