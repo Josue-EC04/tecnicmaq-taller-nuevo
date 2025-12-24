@@ -7,6 +7,10 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from collections import defaultdict
 from datetime import datetime
+import json
+from datetime import datetime
+from flask import send_file, Response, make_response
+from werkzeug.security import generate_password_hash
 
 # Importamos todos los modelos en una sola línea para evitar errores
 from .models import Repuesto, Reserva, Usuario, Venta, db
@@ -344,3 +348,125 @@ def eliminar_venta(id):
 
     # 2. Volvemos a la pantalla de reporte de ventas
     return redirect(url_for('main.historial_ventas'))
+
+# --- SISTEMA DE RESPALDO (BACKUP Y RESTORE) ---
+
+@main.route('/backup')
+@login_required
+def descargar_backup():
+    # 1. Recopilar todos los datos
+    usuarios = Usuario.query.all()
+    repuestos = Repuesto.query.all()
+    ventas = Venta.query.all()
+    reservas = Reserva.query.all()
+
+    data = {
+        'usuarios': [],
+        'repuestos': [],
+        'ventas': [],
+        'reservas': []
+    }
+
+    # 2. Guardar Usuarios (Ojo: guardamos el hash de la contraseña, no la plana)
+    for u in usuarios:
+        data['usuarios'].append({
+            'username': u.username,
+            'password_hash': u.password, # Guardamos la encriptada
+            'nombre': u.nombre
+        })
+
+    # 3. Guardar Repuestos
+    for r in repuestos:
+        data['repuestos'].append({
+            'codigo': r.codigo,
+            'nombre': r.nombre,
+            'marca': r.marca,
+            'cantidad': r.cantidad,
+            'costo': r.costo,
+            'precio': r.precio,
+            'imagen_filename': r.imagen_filename
+        })
+
+    # 4. Guardar Ventas
+    for v in ventas:
+        data['ventas'].append({
+            'fecha': v.fecha.strftime('%Y-%m-%d %H:%M:%S'), # Convertimos fecha a texto
+            'cantidad': v.cantidad,
+            'precio_unitario': v.precio_unitario,
+            'costo_unitario': v.costo_unitario,
+            'ganancia_total': v.ganancia_total,
+            'repuesto_nombre': v.repuesto_nombre,
+            'repuesto_codigo': v.repuesto_codigo
+        })
+
+    # 5. Generar archivo JSON descargable
+    json_str = json.dumps(data, indent=4)
+    response = Response(json_str, mimetype='application/json')
+    response.headers['Content-Disposition'] = f'attachment; filename=backup_{datetime.now().strftime("%Y%m%d")}.json'
+    return response
+
+@main.route('/restaurar', methods=['GET', 'POST'])
+# @login_required <-- IMPORTANTE: La primera vez que restaures una base vacía, no podrás loguearte. 
+# Así que dejaremos esto abierto SOLO si no hay usuarios, o protegido si ya hay.
+def subir_backup():
+    # Si ya hay un admin creado, exigimos login. Si está vacía (desastre), dejamos pasar.
+    if Usuario.query.first() and not current_user.is_authenticated:
+        return redirect(url_for('main.login'))
+
+    if request.method == 'POST':
+        file = request.files['archivo']
+        if file:
+            try:
+                data = json.load(file)
+
+                # 1. Restaurar Usuarios (Solo si no existen)
+                for u_data in data['usuarios']:
+                    if not Usuario.query.filter_by(username=u_data['username']).first():
+                        nuevo_user = Usuario(
+                            username=u_data['username'],
+                            password=u_data['password_hash'], # Usamos el hash guardado
+                            nombre=u_data['nombre']
+                        )
+                        db.session.add(nuevo_user)
+                
+                # 2. Restaurar Repuestos
+                # Borramos los actuales para evitar duplicados o solo agregamos los que faltan.
+                # Para facilitar, aquí asumimos que estamos en una base NUEVA y VACÍA.
+                for r_data in data['repuestos']:
+                    if not Repuesto.query.filter_by(codigo=r_data['codigo']).first():
+                        nuevo_rep = Repuesto(
+                            codigo=r_data['codigo'],
+                            nombre=r_data['nombre'],
+                            marca=r_data['marca'],
+                            cantidad=r_data['cantidad'],
+                            costo=r_data['costo'],
+                            precio=r_data['precio'],
+                            imagen_filename=r_data['imagen_filename']
+                        )
+                        db.session.add(nuevo_rep)
+
+                # 3. Restaurar Ventas
+                for v_data in data['ventas']:
+                    # Convertimos texto de fecha a objeto fecha real
+                    fecha_obj = datetime.strptime(v_data['fecha'], '%Y-%m-%d %H:%M:%S')
+                    
+                    nueva_venta = Venta(
+                        fecha=fecha_obj,
+                        cantidad=v_data['cantidad'],
+                        precio_unitario=v_data['precio_unitario'],
+                        costo_unitario=v_data['costo_unitario'],
+                        ganancia_total=v_data['ganancia_total'],
+                        repuesto_nombre=v_data['repuesto_nombre'],
+                        repuesto_codigo=v_data['repuesto_codigo']
+                    )
+                    db.session.add(nueva_venta)
+
+                db.session.commit()
+                flash('¡Base de datos restaurada exitosamente!', 'success')
+                return redirect(url_for('main.dashboard'))
+
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error al procesar el archivo: {str(e)}', 'danger')
+
+    return render_template('restaurar.html')
