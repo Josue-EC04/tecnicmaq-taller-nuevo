@@ -398,7 +398,16 @@ def descargar_backup():
             'repuesto_nombre': v.repuesto_nombre,
             'repuesto_codigo': v.repuesto_codigo
         })
-
+    
+    # 4.5. Guardar Reservas (AGREGA ESTO)
+    for res in reservas:
+        data['reservas'].append({
+            'cliente': res.cliente,
+            'telefono': res.telefono,
+            'cantidad': res.cantidad,
+            'repuesto_codigo': res.repuesto.codigo  # Guardamos el código para re-vincularlo luego
+        })
+    
     # 5. Generar archivo JSON descargable
     json_str = json.dumps(data, indent=4)
     response = Response(json_str, mimetype='application/json')
