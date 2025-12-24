@@ -8,7 +8,7 @@
         width: 60px;
         height: 60px;
         object-fit: cover;
-        transition: transform 0.2s ease; /* Más rápido se siente mejor */
+        transition: transform 0.2s ease;
         cursor: pointer;
         border-radius: 4px;
         position: relative;
@@ -17,8 +17,8 @@
 
     /* Efecto al pasar el mouse */
     .img-zoom:hover {
-        transform: scale(3.5); /* Crece 3.5 veces */
-        z-index: 1000; /* Se pone MUY por encima de todo */
+        transform: scale(3.5);
+        z-index: 1000;
         border: 2px solid white;
         box-shadow: 0 5px 15px rgba(0,0,0,0.5);
     }
@@ -38,25 +38,33 @@
 
 <div class="card shadow-sm mb-4 border-0 bg-light">
     <div class="card-body py-3">
-        <form action="/inventario" method="GET" class="row g-2 align-items-center">
-            <div class="col">
-                <input 
-                    class="form-control form-control-lg" 
-                    type="search" 
-                    name="q" 
-                    placeholder="🔍 Buscar por nombre, código o marca..." 
-                    value="{{ request.args.get('q', '') }}" 
-                >
+        <div class="row g-2 align-items-center">
+            
+            <div class="col-md-8">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                    <input 
+                        type="text" 
+                        id="inputBusqueda" 
+                        class="form-control form-control-lg border-start-0" 
+                        placeholder="Escribe nombre, código o marca para buscar..."
+                        autocomplete="off"
+                    >
+                </div>
             </div>
-            <div class="col-auto">
-                <button class="btn btn-primary btn-lg px-4" type="submit">Buscar</button>
+
+            <div class="col-md-4">
+                <select id="selectOrden" class="form-select form-select-lg">
+                    <option value="defecto">📅 Más Recientes (Defecto)</option>
+                    <option value="nombre_asc">🔤 Nombre (A-Z)</option>
+                    <option value="nombre_desc">🔤 Nombre (Z-A)</option>
+                    <option value="precio_alto">💲 Precio (Mayor a Menor)</option>
+                    <option value="precio_bajo">💲 Precio (Menor a Mayor)</option>
+                    <option value="stock_bajo">⚠️ Stock (Menor a Mayor)</option>
+                </select>
             </div>
-            {% if request.args.get('q') %}
-            <div class="col-auto">
-                <a href="/inventario" class="btn btn-outline-secondary btn-lg">Limpiar</a>
-            </div>
-            {% endif %}
-        </form>
+
+        </div>
     </div>
 </div>
 
@@ -76,7 +84,8 @@
                     <tr>
                         <th style="width: 80px;">Foto</th>
                         <th>Código</th>
-                        <th>Nombre / Marca</th> <th class="text-center">Stock</th>
+                        <th>Nombre / Marca</th> 
+                        <th class="text-center">Stock</th>
                         
                         <th class="text-secondary" title="Costo de Compra">Costo</th>
                         <th class="text-success" title="Precio de Venta">P. Venta</th>
@@ -86,9 +95,14 @@
                     </tr>
                 </thead>
 
-                <tbody>
+                <tbody id="tablaCuerpo">
                     {% for repuesto in repuestos %}
-                    <tr>
+                    
+                    <tr class="fila-producto" 
+                        data-nombre="{{ repuesto.nombre|lower }} {{ repuesto.marca|lower }} {{ repuesto.codigo|lower }}" 
+                        data-precio="{{ repuesto.precio }}" 
+                        data-stock="{{ repuesto.cantidad }}">
+
                         <td class="text-center">
                             <img src="{{ url_for('static', filename='uploads/' + repuesto.imagen_filename) }}" 
                                 alt="{{ repuesto.nombre }}" 
@@ -137,7 +151,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8" class="text-center py-5">No hay repuestos.</td></tr>
+                    <tr><td colspan="8" class="text-center py-5">No hay repuestos registrados.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -145,4 +159,83 @@
     </div>
 </div>
 
-<br><br> {% endblock %}
+<br><br> 
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const inputBusqueda = document.getElementById('inputBusqueda');
+    const selectOrden = document.getElementById('selectOrden');
+    const tablaCuerpo = document.getElementById('tablaCuerpo');
+    
+    // Obtenemos las filas. Si no hay filas (tabla vacía), esto será un array vacío.
+    let filas = Array.from(tablaCuerpo.getElementsByClassName('fila-producto'));
+
+    // --- FUNCIÓN 1: BÚSQUEDA EN VIVO ---
+    inputBusqueda.addEventListener('keyup', function(e) {
+        const termino = e.target.value.toLowerCase();
+
+        filas.forEach(fila => {
+            // Buscamos en el atributo data-nombre que contiene nombre, marca y código
+            const contenido = fila.getAttribute('data-nombre');
+            
+            if (contenido.includes(termino)) {
+                fila.style.display = ''; // Mostrar si coincide
+            } else {
+                fila.style.display = 'none'; // Ocultar si no coincide
+            }
+        });
+    });
+
+    // --- FUNCIÓN 2: ORDENAMIENTO ---
+    selectOrden.addEventListener('change', function(e) {
+        const criterio = e.target.value;
+        
+        // Si elige "Defecto", lo más fácil es recargar para ver el orden de la BD original
+        if(criterio === 'defecto') {
+            window.location.reload(); 
+            return;
+        }
+
+        // Ordenamos el array de filas en memoria
+        const filasOrdenadas = filas.sort((a, b) => {
+            // Obtenemos los valores de A y B
+            const nombreA = a.getAttribute('data-nombre');
+            const nombreB = b.getAttribute('data-nombre');
+            const precioA = parseFloat(a.getAttribute('data-precio'));
+            const precioB = parseFloat(b.getAttribute('data-precio'));
+            const stockA = parseInt(a.getAttribute('data-stock'));
+            const stockB = parseInt(b.getAttribute('data-stock'));
+
+            // Lógica de comparación según lo seleccionado
+            switch(criterio) {
+                case 'nombre_asc': return nombreA.localeCompare(nombreB);
+                case 'nombre_desc': return nombreB.localeCompare(nombreA);
+                case 'precio_alto': return precioB - precioA;
+                case 'precio_bajo': return precioA - precioB;
+                case 'stock_bajo': return stockA - stockB;
+                default: return 0;
+            }
+        });
+
+        // Limpiamos la tabla visual y pegamos las filas ordenadas
+        tablaCuerpo.innerHTML = '';
+        filasOrdenadas.forEach(fila => tablaCuerpo.appendChild(fila));
+        
+        // RE-APLICAR FILTRO DE BÚSQUEDA
+        // (Por si el usuario ordenó mientras tenía una búsqueda escrita)
+        const terminoActual = inputBusqueda.value.toLowerCase();
+        if(terminoActual !== '') {
+            filasOrdenadas.forEach(fila => {
+                const contenido = fila.getAttribute('data-nombre');
+                if (contenido.includes(terminoActual)) {
+                    fila.style.display = '';
+                } else {
+                    fila.style.display = 'none';
+                }
+            });
+        }
+    });
+});
+</script>
+
+{% endblock %}
