@@ -14,8 +14,8 @@ with app.app_context():
     print("✨ Tablas nuevas creadas.")
 
     # 3. CREAMOS AL ADMIN
-    usuario = "admin"
-    password_plano = "admin123" 
+    usuario = "tecnicmaq"
+    password_plano = "tecnicmaqeck4411" 
     password_segura = generate_password_hash(password_plano)
     
     nuevo_admin = Usuario(nombre="Administrador", username=usuario, password=password_segura)
