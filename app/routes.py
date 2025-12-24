@@ -1,15 +1,15 @@
 import os
 import uuid
+import secrets  # <--- Agregado porque lo usas en la función 'editar'
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from werkzeug.utils import secure_filename
-from .models import Repuesto, db
-from .models import Repuesto, Reserva, db
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from .models import Repuesto, Reserva, Usuario, Venta, db
 from collections import defaultdict
 from datetime import datetime
 
+# Importamos todos los modelos en una sola línea para evitar errores
+from .models import Repuesto, Reserva, Usuario, Venta, db
 # Creamos el Blueprint
 main = Blueprint('main', __name__)
 
@@ -322,3 +322,25 @@ def historial_ventas():
     return render_template('reporte_ventas.html', 
                            historial_agrupado=historial_agrupado, 
                            total_ganancia_global=total_ganancia_global)
+
+@main.route('/eliminar_venta/<int:id>', methods=['POST'])
+@login_required
+def eliminar_venta(id):
+    # 1. Buscamos la venta por su ID
+    venta_a_eliminar = Venta.query.get_or_404(id)
+    
+    try:
+        # ⚠️ IMPORTANTE: Aquí decidimos si solo borramos el registro
+        # o si también devolvemos el producto al inventario.
+        # Por ahora, haremos un borrado simple del registro.
+        
+        db.session.delete(venta_a_eliminar)
+        db.session.commit()
+        flash('Venta eliminada del historial.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar la venta: {e}', 'danger')
+
+    # 2. Volvemos a la pantalla de reporte de ventas
+    return redirect(url_for('main.historial_ventas'))

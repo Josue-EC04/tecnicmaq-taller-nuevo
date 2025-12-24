@@ -62,6 +62,7 @@
                                 <th>Precio Unit.</th>
                                 <th>Total Venta</th>
                                 <th class="text-success text-end">Ganancia</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -79,6 +80,14 @@
                                 <td class="fw-bold">${{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</td>
                                 <td class="text-success fw-bold text-end">
                                     + ${{ "%.2f"|format(venta.ganancia_total) }}
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('main.eliminar_venta', id=venta.id) }}" method="POST" style="display:inline;">
+                                        <button type="submit" class="btn btn-danger btn-sm" 
+                                                onclick="return confirm('¿Seguro que quieres eliminar esta venta? Esto no devuelve el stock al inventario automáticamente.');">
+                                            🗑 Borrar
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}
