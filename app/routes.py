@@ -1,18 +1,19 @@
 import os
 import uuid
-import secrets  # <--- Agregado porque lo usas en la función 'editar'
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
-from werkzeug.utils import secure_filename
-from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import check_password_hash, generate_password_hash
-from collections import defaultdict
-from datetime import datetime
+import secrets
 import json
+import google.generativeai as genai
 from datetime import datetime
-from flask import send_file, Response, make_response
-from werkzeug.security import generate_password_hash
+from collections import defaultdict
 
-# Importamos todos los modelos en una sola línea para evitar errores
+# Agrupamos todo lo de Flask en una línea para no olvidarnos nada
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, make_response, jsonify
+
+from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash, generate_password_hash
+from flask_login import login_user, logout_user, login_required, current_user
+
+# Tus modelos
 from .models import Repuesto, Reserva, Usuario, Venta, db
 # Creamos el Blueprint
 main = Blueprint('main', __name__)
@@ -479,3 +480,104 @@ def subir_backup():
                 flash(f'Error al procesar el archivo: {str(e)}', 'danger')
 
     return render_template('restaurar.html')
+
+# --- CHATBOT ---
+
+@main.route('/chatbot', methods=['POST'])
+@login_required
+def chatbot_responde():
+    data = request.get_json()
+    mensaje_usuario = data.get('mensaje', '')
+    
+    # 1. Verificamos la API Key
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        return jsonify({'respuesta': '⚠️ Error: No configuraste la GEMINI_API_KEY en el .env o en Render.'})
+    
+    # 2. Configuramos Gemini
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash') # Modelo rápido y ligero
+
+    # 3. El PROMPT DEL SISTEMA (Las "instrucciones secretas" para la IA)
+    instruccion_sistema = f"""
+    Eres el asistente del taller 'Tecnicmaq'. Tu misión es interpretar lo que dice el usuario y responder con ACCIONES DE BASE DE DATOS o conversación normal.
+
+    TUS REGLAS OBLIGATORIAS:
+    
+    CASO 1: Si el usuario quiere CREAR, AGREGAR o INGRESAR un repuesto:
+    - Debes extraer: Codigo, Nombre, Precio, Stock.
+    - Si falta el Código, inventa uno corto (ej: GEN-01). Si falta Stock, pon 1.
+    - RESPONDE SOLO CON ESTE FORMATO EXACTO: 
+      COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK
+    
+    CASO 2: Si el usuario quiere BUSCAR o SABER SI HAY algo:
+    - Extrae la palabra clave principal.
+    - RESPONDE SOLO CON ESTE FORMATO EXACTO: 
+      COMANDO_BUSCAR|PALABRA_CLAVE
+
+    CASO 3: Si es saludo o charla:
+    - Responde amable y corto. No uses formatos raros.
+
+    Mensaje del usuario: "{mensaje_usuario}"
+    """
+
+    try:
+        # 4. Enviamos el mensaje a Google
+        response = model.generate_content(instruccion_sistema)
+        respuesta_ia = response.text.strip()
+
+        # 5. Interpretamos la respuesta de la IA
+        
+        # --- CASO A: CREAR ---
+        if "COMANDO_CREAR|" in respuesta_ia:
+            # Limpiamos el texto por si la IA agregó comillas o espacios
+            datos_raw = respuesta_ia.replace("COMANDO_CREAR|", "").strip()
+            datos = datos_raw.split('|')
+            
+            # Datos extraídos por la IA
+            codigo_ia = datos[0]
+            nombre_ia = datos[1]
+            precio_ia = float(datos[2])
+            stock_ia = int(datos[3])
+
+            # Creamos en la Base de Datos
+            nuevo = Repuesto(
+                codigo=codigo_ia,
+                nombre=nombre_ia,
+                marca="Generico", # La IA podría extraer esto también, pero simplificamos
+                cantidad=stock_ia,
+                costo=precio_ia * 0.7, # Calculamos costo automático (70% del precio)
+                precio=precio_ia,
+                imagen_filename='default.jpg'
+            )
+            db.session.add(nuevo)
+            db.session.commit()
+            
+            return jsonify({'respuesta': f"✅ ¡Listo! Agregué '{nombre_ia}' (Stock: {stock_ia}) a S/{precio_ia}."})
+
+        # --- CASO B: BUSCAR ---
+        elif "COMANDO_BUSCAR|" in respuesta_ia:
+            termino = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip()
+            
+            # Buscamos en tu DB
+            resultados = Repuesto.query.filter(
+                (Repuesto.nombre.ilike(f'%{termino}%')) | 
+                (Repuesto.codigo.ilike(f'%{termino}%')) |
+                (Repuesto.marca.ilike(f'%{termino}%'))
+            ).all()
+
+            if resultados:
+                texto_resp = f"🔍 Esto encontré para '{termino}':\n"
+                for r in resultados:
+                    texto_resp += f"• {r.nombre} | Stock: {r.cantidad} | S/{r.precio}\n"
+                return jsonify({'respuesta': texto_resp})
+            else:
+                return jsonify({'respuesta': f"❌ No encontré nada sobre '{termino}' en el inventario."})
+
+        # --- CASO C: CHARLA NORMAL ---
+        else:
+            return jsonify({'respuesta': respuesta_ia})
+
+    except Exception as e:
+        print(f"Error Gemini: {e}")
+        return jsonify({'respuesta': "😵 Mi cerebro de IA se mareó. Intenta escribirlo de otra forma."})
