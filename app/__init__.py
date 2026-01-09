@@ -1,56 +1,39 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 import os
-from dotenv import load_dotenv
 
-# Cargamos las variables del archivo .env
-load_dotenv()
-
-# Inicializamos las extensiones (Base de datos y Login)
-db = SQLAlchemy()
-login_manager = LoginManager()
+# IMPORTANTE: Importamos 'db' y 'Usuario' desde .models para usar la misma instancia
+from .models import db, Usuario
+from .routes import main
 
 def create_app():
     app = Flask(__name__)
 
-    # Configuraciones
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+    # --- CONFIGURACIÓN ---
+    app.config['SECRET_KEY'] = 'tecnicmaq_secreto_2026' # Puedes cambiarlo
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tecnicmaq.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
-    # Define la ruta absoluta donde se guardarán las imágenes
-    UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/uploads')
-    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-    # Define qué extensiones permitimos (por seguridad)
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
-
-    # Iniciamos las herramientas con la app
-    db.init_app(app)
-    login_manager.init_app(app)
-    login_manager.login_view = 'main.login' # A donde ir si no estás logueado
-
-    # Importamos y registramos las rutas (Blueprints)
-    from .routes import main
-    app.register_blueprint(main)
-
-    # Creamos las tablas de la base de datos si no existen
-    with app.app_context():
-        db.create_all()
-
-# app/__init__.py
-
-    # ... (código anterior)
+    # Configuración de carpeta de subidas (asegura que exista)
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg'}
     
-    login_manager.init_app(app)
-    login_manager.login_view = 'main.login'
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
 
-    # AGREGA ESTO AQUÍ:
-    from .models import Usuario
+    # --- INICIALIZAR LA BASE DE DATOS (EL CABLE QUE FALTABA) ---
+    db.init_app(app)
+
+    # --- CONFIGURACIÓN LOGIN ---
+    login_manager = LoginManager()
+    login_manager.login_view = 'main.login'
+    login_manager.init_app(app)
+
     @login_manager.user_loader
     def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
-    from .routes import main
-    # ... (resto del código)
+    # --- REGISTRAR RUTAS ---
+    app.register_blueprint(main)
+
     return app
