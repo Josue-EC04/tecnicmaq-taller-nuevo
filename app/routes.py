@@ -2,20 +2,20 @@ import os
 import uuid
 import secrets
 import json
+import pandas as pd
 import google.generativeai as genai
 from datetime import datetime
 from collections import defaultdict
+from sqlalchemy import func
 
-# Agrupamos todo lo de Flask en una línea para no olvidarnos nada
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, make_response, jsonify, session
-
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import login_user, logout_user, login_required, current_user
 
-
 # Tus modelos
 from .models import Repuesto, Reserva, Usuario, Venta, db
+
 # Creamos el Blueprint
 main = Blueprint('main', __name__)
 
@@ -27,13 +27,9 @@ def allowed_file(filename):
 
 def guardar_imagen(file):
     if file and allowed_file(file.filename):
-        # Limpiamos el nombre
         filename = secure_filename(file.filename)
-        # Generamos nombre único
         unique_filename = f"{uuid.uuid4().hex[:8]}_{filename}"
-        # Ruta completa
         file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-        # Guardamos
         file.save(file_path)
         return unique_filename
     return None
@@ -42,17 +38,17 @@ def guardar_imagen(file):
 
 @main.route('/')
 def dashboard():
-    # CAMBIO 1: Si no ha entrado, REDIRIGIR a /login
-    # (Esto evita el error del logo y el Method Not Allowed)
     if not current_user.is_authenticated:
         return redirect(url_for('main.login'))
     
-    # --- CÁLCULO DE ESTADÍSTICAS (Igual que antes) ---
+    # --- CÁLCULO OPTIMIZADO (VELOCIDAD EXTREMA) ---
     total_tipos = Repuesto.query.count()
     alertas_stock = Repuesto.query.filter(Repuesto.cantidad < 5).count()
     total_reservas = Reserva.query.count()
-    repuestos = Repuesto.query.all()
-    valor_inventario = sum(r.precio * r.cantidad for r in repuestos)
+    
+    # Suma directa en base de datos (No descarga los productos a Python)
+    total_valor = db.session.query(func.sum(Repuesto.costo * Repuesto.cantidad)).scalar()
+    valor_inventario = total_valor if total_valor else 0
 
     return render_template('dashboard.html', 
                            total_tipos=total_tipos,
@@ -63,22 +59,32 @@ def dashboard():
 @main.route('/inventario')
 @login_required
 def inventario():
+    # --- PAGINACIÓN (Carga de 20 en 20) ---
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
     busqueda = request.args.get('q')
+    
+    query = Repuesto.query
+
     if busqueda:
-        # Filtramos por nombre O código (ignorando mayúsculas)
-        repuestos = Repuesto.query.filter(
+        query = query.filter(
             (Repuesto.nombre.ilike(f'%{busqueda}%')) | 
             (Repuesto.codigo.ilike(f'%{busqueda}%'))
-        ).all()
-    else:
-        repuestos = Repuesto.query.all()
-    return render_template('inventario.html', repuestos=repuestos)
+        )
+    
+    # Usamos paginate en lugar de all()
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    repuestos = pagination.items
+
+    return render_template('inventario.html', 
+                           repuestos=repuestos, 
+                           pagination=pagination,
+                           busqueda=busqueda)
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
-    # Si ya está logueado, lo mandamos al Dashboard (Inicio)
     if current_user.is_authenticated:
-        return redirect(url_for('main.dashboard')) # <--- CAMBIO 2: Ir al Dashboard
+        return redirect(url_for('main.dashboard'))
 
     if request.method == 'POST':
         username = request.form.get('username')
@@ -88,7 +94,6 @@ def login():
         
         if usuario_db and check_password_hash(usuario_db.password, password):
             login_user(usuario_db)
-            # CAMBIO 3: Al loguearse exitosamente, ir al Dashboard
             return redirect(url_for('main.dashboard')) 
         else:
             flash('Usuario o contraseña incorrectos.', 'danger')
@@ -109,30 +114,32 @@ def agregar():
         codigo = request.form.get('codigo')
         nombre = request.form.get('nombre')
         marca = request.form.get('marca')
-        cantidad = request.form.get('cantidad')
-        costo = request.form.get('costo')
-        precio = request.form.get('precio')
         
-        # Procesar imagen
+        try:
+            # STOCK COMO ENTERO
+            cantidad = int(request.form.get('cantidad') or 0)
+            costo = float(request.form.get('costo') or 0)
+            precio = float(request.form.get('precio') or 0)
+        except ValueError:
+            flash('Error: Verifica que los números sean correctos.', 'danger')
+            return redirect(url_for('main.agregar'))
+
         file = request.files.get('imagen')
         filename = guardar_imagen(file)
         if not filename:
             filename = 'default.jpg'
 
-        # Verificar duplicados
-        repuesto_existente = Repuesto.query.filter_by(codigo=codigo).first()
-        if repuesto_existente:
+        if Repuesto.query.filter_by(codigo=codigo).first():
             flash('¡Error! Ya existe un repuesto con ese código.', 'danger')
             return redirect(url_for('main.agregar'))
 
-        # Crear objeto
         nuevo_repuesto = Repuesto(
             codigo=codigo,
             nombre=nombre,
             marca=marca,
-            cantidad=int(cantidad),
-            costo=float(costo),
-            precio=float(precio),
+            cantidad=cantidad,
+            costo=costo,
+            precio=precio,
             imagen_filename=filename
         )
 
@@ -153,19 +160,21 @@ def editar(id):
         repuesto.codigo = request.form.get('codigo')
         repuesto.nombre = request.form.get('nombre')
         repuesto.marca = request.form.get('marca')
-        repuesto.cantidad = int(request.form.get('cantidad'))
         
-        # --- AQUÍ ACTUALIZAMOS LOS PRECIOS ---
-        repuesto.costo = float(request.form.get('costo'))
-        repuesto.precio = float(request.form.get('precio'))
-        # -------------------------------------
+        try:
+            # STOCK COMO ENTERO
+            repuesto.cantidad = int(request.form.get('cantidad') or 0)
+            repuesto.costo = float(request.form.get('costo') or 0)
+            repuesto.precio = float(request.form.get('precio') or 0)
+        except ValueError:
+            flash('Error: Valores numéricos inválidos.', 'danger')
+            return redirect(url_for('main.editar', id=id))
 
-        # Lógica de imagen (se mantiene igual)
         imagen = request.files.get('imagen')
         if imagen and imagen.filename != '':
-            filename = secrets.token_hex(8) + "_" + imagen.filename
-            imagen.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
-            repuesto.imagen_filename = filename
+            filename = guardar_imagen(imagen)
+            if filename:
+                repuesto.imagen_filename = filename
             
         db.session.commit()
         flash('Repuesto actualizado correctamente', 'success')
@@ -188,45 +197,45 @@ def vender_producto(id):
     repuesto = Repuesto.query.get_or_404(id)
     
     if request.method == 'POST':
-        cantidad = int(request.form.get('cantidad'))
+        try:
+            # VENTA SOLO EN ENTEROS
+            cantidad = int(request.form.get('cantidad') or 0)
+        except ValueError:
+            flash('Cantidad inválida.', 'danger')
+            return redirect(url_for('main.vender_producto', id=id))
         
-        # 1. Validar Stock
         if cantidad > repuesto.cantidad:
             flash('Error: No hay suficiente stock para esa venta.', 'danger')
             return redirect(url_for('main.vender_producto', id=id))
             
-        # 2. Calcular los dineros
         total_pagar = repuesto.precio * cantidad
         ganancia = (repuesto.precio - repuesto.costo) * cantidad
         
-        # 3. RESTAR STOCK
         repuesto.cantidad -= cantidad
         
-        # 4. GUARDAR EN EL HISTORIAL (La parte nueva)
         nueva_venta = Venta(
             cantidad=cantidad,
             precio_unitario=repuesto.precio,
             costo_unitario=repuesto.costo,
             ganancia_total=ganancia,
-            repuesto_nombre=repuesto.nombre, # Guardamos nombre por si luego borras el producto
+            repuesto_nombre=repuesto.nombre,
             repuesto_codigo=repuesto.codigo
         )
         
         db.session.add(nueva_venta)
         db.session.commit()
         
-        flash(f'¡Venta registrada! Ingreso: S/{total_pagar} | Ganancia: S/{ganancia}', 'success')
+        flash(f'¡Venta registrada! Ingreso: S/{total_pagar:.2f} | Ganancia: S/{ganancia:.2f}', 'success')
         return redirect(url_for('main.inventario'))
         
     return render_template('form_venta.html', repuesto=repuesto)
-# 1. RUTA PARA VER TODAS LAS RESERVAS
+
 @main.route('/reservas')
 @login_required
 def lista_reservas():
     reservas = Reserva.query.all()
     return render_template('reservas.html', reservas=reservas)
 
-# 2. RUTA PARA HACER UNA RESERVA (Formulario)
 @main.route('/reservar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def crear_reserva(id):
@@ -235,22 +244,23 @@ def crear_reserva(id):
     if request.method == 'POST':
         cliente = request.form.get('cliente')
         telefono = request.form.get('telefono')
-        cantidad = int(request.form.get('cantidad'))
+        try:
+            cantidad = int(request.form.get('cantidad') or 0)
+        except ValueError:
+            flash('Cantidad inválida.', 'danger')
+            return redirect(url_for('main.crear_reserva', id=id))
         
-        # Validación de Stock
         if cantidad > repuesto.cantidad:
-            flash('Error: No hay suficiente stock para reservar esa cantidad.', 'danger')
+            flash('Error: No hay suficiente stock.', 'danger')
             return redirect(url_for('main.crear_reserva', id=id))
             
-        # RESTAMOS EL STOCK (Para apartarlo físicamente)
         repuesto.cantidad -= cantidad
         
-        # CREAMOS LA RESERVA
         nueva_reserva = Reserva(
             cliente=cliente,
             telefono=telefono,
             cantidad=cantidad,
-            repuesto=repuesto # Guardamos la relación
+            repuesto=repuesto
         )
         
         db.session.add(nueva_reserva)
@@ -261,52 +271,47 @@ def crear_reserva(id):
         
     return render_template('form_reserva.html', repuesto=repuesto)
 
-# 3. ACCIONES: CONFIRMAR VENTA O CANCELAR
 @main.route('/gestion_reserva/<int:id>/<accion>')
 @login_required
 def gestion_reserva(id, accion):
     reserva = Reserva.query.get_or_404(id)
-    repuesto = reserva.repuesto # Obtenemos el repuesto gracias a la relación
+    repuesto = reserva.repuesto 
     
     if accion == 'confirmar':
-        # La venta se concreta. El stock YA se había restado, así que solo borramos la reserva.
         db.session.delete(reserva)
         db.session.commit()
         flash('Venta completada desde reserva.', 'success')
         
     elif accion == 'cancelar':
-        # Se cancela. DEVOLVEMOS el stock al inventario.
-        repuesto.cantidad += reserva.cantidad
+        if repuesto:
+            repuesto.cantidad += reserva.cantidad
+        else:
+            flash('El producto original ya no existe, pero se borró la reserva.', 'warning')
+            
         db.session.delete(reserva)
         db.session.commit()
-        flash('Reserva cancelada. Stock devuelto al inventario.', 'warning')
+        flash('Reserva cancelada. Stock devuelto.', 'warning')
         
     return redirect(url_for('main.lista_reservas'))
 
 @main.route('/historial-ventas')
 @login_required
 def historial_ventas():
-    # 1. Traemos todas las ventas ordenadas por fecha (la más reciente primero)
     ventas = Venta.query.order_by(Venta.fecha.desc()).all()
     
-    # 2. Diccionario para traducir meses a español (Python lo da en inglés)
     nombres_meses = {
         1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 
         5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto', 
         9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
     }
 
-    # 3. Estructura para agrupar: 
-    # Clave: "Diciembre 2025" -> Valor: {lista_ventas, total_ganancia, total_ingreso}
     historial_agrupado = {}
 
     for venta in ventas:
-        # Creamos una clave única: "Mes Año" (Ej: Diciembre 2025)
         mes_nombre = nombres_meses[venta.fecha.month]
         anio = venta.fecha.year
         clave_periodo = f"{mes_nombre} {anio}"
         
-        # Si es la primera vez que vemos este mes, inicializamos sus datos
         if clave_periodo not in historial_agrupado:
             historial_agrupado[clave_periodo] = {
                 'ventas': [],
@@ -314,15 +319,11 @@ def historial_ventas():
                 'suma_ganancia': 0
             }
         
-        # Agregamos la venta a ese mes
         historial_agrupado[clave_periodo]['ventas'].append(venta)
-        
-        # Sumamos a los totales de ese mes
         ingreso_venta = venta.precio_unitario * venta.cantidad
         historial_agrupado[clave_periodo]['suma_ingresos'] += ingreso_venta
         historial_agrupado[clave_periodo]['suma_ganancia'] += venta.ganancia_total
 
-    # 4. Total histórico global (de todos los tiempos)
     total_ganancia_global = sum(v.ganancia_total for v in ventas)
     
     return render_template('reporte_ventas.html', 
@@ -332,52 +333,36 @@ def historial_ventas():
 @main.route('/eliminar_venta/<int:id>', methods=['POST'])
 @login_required
 def eliminar_venta(id):
-    # 1. Buscamos la venta por su ID
     venta_a_eliminar = Venta.query.get_or_404(id)
-    
     try:
-        # ⚠️ IMPORTANTE: Aquí decidimos si solo borramos el registro
-        # o si también devolvemos el producto al inventario.
-        # Por ahora, haremos un borrado simple del registro.
-        
         db.session.delete(venta_a_eliminar)
         db.session.commit()
         flash('Venta eliminada del historial.', 'success')
-        
     except Exception as e:
         db.session.rollback()
         flash(f'Error al eliminar la venta: {e}', 'danger')
 
-    # 2. Volvemos a la pantalla de reporte de ventas
     return redirect(url_for('main.historial_ventas'))
-
-# --- SISTEMA DE RESPALDO (BACKUP Y RESTORE) ---
 
 @main.route('/backup')
 @login_required
 def descargar_backup():
-    # 1. Recopilar todos los datos
     usuarios = Usuario.query.all()
     repuestos = Repuesto.query.all()
     ventas = Venta.query.all()
     reservas = Reserva.query.all()
 
     data = {
-        'usuarios': [],
-        'repuestos': [],
-        'ventas': [],
-        'reservas': []
+        'usuarios': [], 'repuestos': [], 'ventas': [], 'reservas': []
     }
 
-    # 2. Guardar Usuarios (Ojo: guardamos el hash de la contraseña, no la plana)
     for u in usuarios:
         data['usuarios'].append({
             'username': u.username,
-            'password_hash': u.password, # Guardamos la encriptada
+            'password_hash': u.password, 
             'nombre': u.nombre
         })
 
-    # 3. Guardar Repuestos
     for r in repuestos:
         data['repuestos'].append({
             'codigo': r.codigo,
@@ -389,10 +374,9 @@ def descargar_backup():
             'imagen_filename': r.imagen_filename
         })
 
-    # 4. Guardar Ventas
     for v in ventas:
         data['ventas'].append({
-            'fecha': v.fecha.strftime('%Y-%m-%d %H:%M:%S'), # Convertimos fecha a texto
+            'fecha': v.fecha.strftime('%Y-%m-%d %H:%M:%S'),
             'cantidad': v.cantidad,
             'precio_unitario': v.precio_unitario,
             'costo_unitario': v.costo_unitario,
@@ -401,26 +385,22 @@ def descargar_backup():
             'repuesto_codigo': v.repuesto_codigo
         })
     
-    # 4.5. Guardar Reservas (AGREGA ESTO)
     for res in reservas:
-        data['reservas'].append({
-            'cliente': res.cliente,
-            'telefono': res.telefono,
-            'cantidad': res.cantidad,
-            'repuesto_codigo': res.repuesto.codigo  # Guardamos el código para re-vincularlo luego
-        })
+        if res.repuesto:
+            data['reservas'].append({
+                'cliente': res.cliente,
+                'telefono': res.telefono,
+                'cantidad': res.cantidad,
+                'repuesto_codigo': res.repuesto.codigo 
+            })
     
-    # 5. Generar archivo JSON descargable
     json_str = json.dumps(data, indent=4)
     response = Response(json_str, mimetype='application/json')
     response.headers['Content-Disposition'] = f'attachment; filename=backup_{datetime.now().strftime("%Y%m%d")}.json'
     return response
 
 @main.route('/restaurar', methods=['GET', 'POST'])
-# @login_required <-- IMPORTANTE: La primera vez que restaures una base vacía, no podrás loguearte. 
-# Así que dejaremos esto abierto SOLO si no hay usuarios, o protegido si ya hay.
 def subir_backup():
-    # Si ya hay un admin creado, exigimos login. Si está vacía (desastre), dejamos pasar.
     if Usuario.query.first() and not current_user.is_authenticated:
         return redirect(url_for('main.login'))
 
@@ -429,41 +409,36 @@ def subir_backup():
         if file:
             try:
                 data = json.load(file)
-
-                # 1. Restaurar Usuarios (Solo si no existen)
-                for u_data in data['usuarios']:
+                # 1. Usuarios
+                for u_data in data.get('usuarios', []):
                     if not Usuario.query.filter_by(username=u_data['username']).first():
                         nuevo_user = Usuario(
                             username=u_data['username'],
-                            password=u_data['password_hash'], # Usamos el hash guardado
+                            password=u_data['password_hash'],
                             nombre=u_data['nombre']
                         )
                         db.session.add(nuevo_user)
                 
-                # 2. Restaurar Repuestos
-                # Borramos los actuales para evitar duplicados o solo agregamos los que faltan.
-                # Para facilitar, aquí asumimos que estamos en una base NUEVA y VACÍA.
-                for r_data in data['repuestos']:
+                # 2. Repuestos
+                for r_data in data.get('repuestos', []):
                     if not Repuesto.query.filter_by(codigo=r_data['codigo']).first():
                         nuevo_rep = Repuesto(
                             codigo=r_data['codigo'],
                             nombre=r_data['nombre'],
                             marca=r_data['marca'],
-                            cantidad=r_data['cantidad'],
+                            cantidad=int(r_data['cantidad']), # Forzar Int
                             costo=r_data['costo'],
                             precio=r_data['precio'],
-                            imagen_filename=r_data['imagen_filename']
+                            imagen_filename=r_data.get('imagen_filename', 'default.jpg')
                         )
                         db.session.add(nuevo_rep)
 
-                # 3. Restaurar Ventas
-                for v_data in data['ventas']:
-                    # Convertimos texto de fecha a objeto fecha real
+                # 3. Ventas
+                for v_data in data.get('ventas', []):
                     fecha_obj = datetime.strptime(v_data['fecha'], '%Y-%m-%d %H:%M:%S')
-                    
                     nueva_venta = Venta(
                         fecha=fecha_obj,
-                        cantidad=v_data['cantidad'],
+                        cantidad=int(v_data['cantidad']), # Forzar Int
                         precio_unitario=v_data['precio_unitario'],
                         costo_unitario=v_data['costo_unitario'],
                         ganancia_total=v_data['ganancia_total'],
@@ -482,64 +457,57 @@ def subir_backup():
 
     return render_template('restaurar.html')
 
-# --- CHATBOT ---
-
 @main.route('/chatbot', methods=['POST'])
 @login_required
 def chatbot_responde():
     data = request.get_json()
     mensaje_usuario = data.get('mensaje', '')
     
-    # --- MEMORIA DEL CHAT ---
     historial = session.get('historial_chat', [])
     contexto_previo = ""
     for msg in historial:
         contexto_previo += f"- {msg['role']}: {msg['text']}\n"
 
-    # --- CONFIGURACIÓN ---
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
-        return jsonify({'respuesta': '⚠️ Error: Falta API Key.'})
+        return jsonify({'respuesta': '⚠️ Error: Falta API Key de Google.'})
     
     genai.configure(api_key=api_key)
-    # Buscamos la línea del modelo (aprox línea 500) y ponemos esto:
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')
 
-    # --- PROMPT CORREGIDO (PARA QUE NO DIGA "CHARLA") ---
     instruccion_sistema = f"""
-    Eres el asistente inteligente de 'Tecnicmaq'.
-    
-    HISTORIAL:
-    {contexto_previo}
-    
-    USUARIO: "{mensaje_usuario}"
+        Eres el asistente inteligente de 'Tecnicmaq'.
+        
+        HISTORIAL:
+        {contexto_previo}
+        
+        USUARIO: "{mensaje_usuario}"
 
-    TU MISIÓN:
-    - Si el usuario pide una acción de inventario, responde con un COMANDO EXACTO.
-    - Si el usuario saluda o conversa, RESPONDE NATURALMENTE (No uses comandos ni etiquetas).
+        TU MISIÓN:
+        - Si el usuario pide una acción de inventario, responde con un COMANDO EXACTO.
+        - Si el usuario saluda o conversa, RESPONDE NATURALMENTE (No uses comandos ni etiquetas).
 
-    REGLAS DE COMANDOS:
-    
-    1. ANÁLISIS (Los "Más" y los "Menos"):
-       - Piden: "el mas caro", "el mas barato", "el que mas stock tiene".
-       - RESPONDE: COMANDO_ANALISIS|CLAVE
-       - Claves: MAX_STOCK, MIN_STOCK, MAX_PRECIO, MIN_PRECIO
-    
-    2. BÚSQUEDA ESPECÍFICA:
-       - Piden nombre, marca o condiciones ("stock 0", "agotados").
-       - RESPONDE: COMANDO_BUSCAR|termino
-    
-    3. CREAR:
-       - Piden agregar algo.
-       - RESPONDE: COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK
-    """
+        REGLAS DE COMANDOS:
+        
+        1. ANÁLISIS (Los "Más" y los "Menos"):
+        - Piden: "el mas caro", "el mas barato", "el que mas stock tiene".
+        - RESPONDE: COMANDO_ANALISIS|CLAVE
+        - Claves: MAX_STOCK, MIN_STOCK, MAX_PRECIO, MIN_PRECIO
+        
+        2. BÚSQUEDA ESPECÍFICA:
+        - Piden nombre, marca o condiciones ("stock 0", "agotados").
+        - RESPONDE: COMANDO_BUSCAR|termino
+        
+        3. CREAR:
+        - Piden agregar algo.
+        - RESPONDE: COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK
+        """
 
     try:
         response = model.generate_content(instruccion_sistema)
         respuesta_ia = response.text.strip()
         respuesta_final = ""
 
-        # --- LÓGICA DE ANÁLISIS ---
         if "COMANDO_ANALISIS|" in respuesta_ia:
             clave = respuesta_ia.replace("COMANDO_ANALISIS|", "").strip()
             query = Repuesto.query
@@ -566,7 +534,6 @@ def chatbot_responde():
             else:
                 respuesta_final = "El inventario está vacío."
 
-        # --- LÓGICA DE BÚSQUEDA ---
         elif "COMANDO_BUSCAR|" in respuesta_ia:
             termino = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip().lower()
             query = Repuesto.query
@@ -576,7 +543,7 @@ def chatbot_responde():
                 desc = "agotados (Stock 0)"
             elif "stock 1" in termino or "stock 0 y 1" in termino:
                 resultados = query.filter(Repuesto.cantidad <= 1).all()
-                desc = "con stock crítico (0 o 1)"
+                desc = "con stock crítico"
             else:
                 resultados = query.filter(
                     (Repuesto.nombre.ilike(f'%{termino}%')) | 
@@ -592,26 +559,31 @@ def chatbot_responde():
             else:
                 respuesta_final = f"❌ No encontré nada {desc}."
 
-        # --- LÓGICA DE CREAR ---
         elif "COMANDO_CREAR|" in respuesta_ia:
             datos = respuesta_ia.replace("COMANDO_CREAR|", "").split('|')
             if len(datos) >= 4:
-                nuevo = Repuesto(
-                    codigo=datos[0], nombre=datos[1], precio=float(datos[2]),
-                    cantidad=int(datos[3]), marca="Generico", costo=float(datos[2])*0.7,
-                    imagen_filename='default.jpg'
-                )
-                db.session.add(nuevo)
-                db.session.commit()
-                respuesta_final = f"✅ Agregado: {datos[1]} a S/{datos[2]} (Stock: {datos[3]})"
+                codigo_nuevo = datos[0]
+                if Repuesto.query.filter_by(codigo=codigo_nuevo).first():
+                    respuesta_final = f"⚠️ Error: El código '{codigo_nuevo}' ya existe."
+                else:
+                    nuevo = Repuesto(
+                        codigo=codigo_nuevo, 
+                        nombre=datos[1], 
+                        precio=float(datos[2]),
+                        cantidad=int(datos[3]), 
+                        marca="Generico IA", 
+                        costo=float(datos[2])*0.7,
+                        imagen_filename='default.jpg'
+                    )
+                    db.session.add(nuevo)
+                    db.session.commit()
+                    respuesta_final = f"✅ Agregado: {datos[1]} a S/{datos[2]} (Stock: {datos[3]})"
             else:
                 respuesta_final = "⚠️ Faltan datos para crear."
 
-        # --- CHARLA NORMAL (Si no es ningún comando, mostramos lo que diga la IA) ---
         else:
             respuesta_final = respuesta_ia
 
-        # Guardar historial
         historial.append({"role": "Usuario", "text": mensaje_usuario})
         historial.append({"role": "Bot", "text": respuesta_final})
         session['historial_chat'] = historial[-6:] 
@@ -619,5 +591,78 @@ def chatbot_responde():
         return jsonify({'respuesta': respuesta_final})
 
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({'respuesta': "😵 Tuve un pequeño error de conexión. Intenta preguntarme de nuevo."})
+        print(f"Error IA: {e}")
+        return jsonify({'respuesta': "😵 Error de conexión con la IA."})
+
+@main.route('/importar_excel', methods=['POST'])
+@login_required
+def importar_excel():
+    if 'archivo_excel' not in request.files:
+        flash('No se seleccionó ningún archivo', 'danger')
+        return redirect(url_for('main.inventario'))
+
+    archivo = request.files['archivo_excel']
+    if archivo.filename == '':
+        flash('El archivo no tiene nombre', 'danger')
+        return redirect(url_for('main.inventario'))
+
+    try:
+        # Leemos Excel asegurando Código como string
+        df = pd.read_excel(archivo, dtype={'Codigo': str})
+        df.columns = df.columns.str.strip()
+
+        # Validamos Columnas
+        cols_requeridas = ['Codigo', 'Nombre', 'Marca', 'Stock', 'Costo_Compra', 'Precio_Venta']
+        faltantes = [col for col in cols_requeridas if col not in df.columns]
+        if faltantes:
+            flash(f'Error columnas: Faltan {", ".join(faltantes)}', 'danger')
+            return redirect(url_for('main.inventario'))
+
+        contador = 0
+        errores = 0
+
+        for index, row in df.iterrows():
+            try:
+                # 1. Validación de código vacío
+                raw_codigo = str(row['Codigo']).strip()
+                if not raw_codigo or raw_codigo.lower() == 'nan':
+                    errores += 1
+                    continue
+
+                if Repuesto.query.filter_by(codigo=raw_codigo).first():
+                    continue 
+                
+                # 2. Conversión segura a ENTERO para stock
+                stock_val = row['Stock'] if pd.notna(row['Stock']) else 0
+                cantidad_int = int(float(stock_val))
+
+                nuevo_repuesto = Repuesto(
+                    codigo = raw_codigo,
+                    nombre = row['Nombre'],
+                    marca = row['Marca'] if pd.notna(row['Marca']) else "Genérico",
+                    cantidad = cantidad_int,
+                    costo = float(row['Costo_Compra'] if pd.notna(row['Costo_Compra']) else 0),
+                    precio = float(row['Precio_Venta'] if pd.notna(row['Precio_Venta']) else 0),
+                    imagen_filename = 'default.jpg'
+                )
+                db.session.add(nuevo_repuesto)
+                contador += 1
+                
+            except Exception as e:
+                print(f"Error fila {index}: {e}")
+                errores += 1
+
+        db.session.commit()
+
+        if contador == 0 and errores > 0:
+             flash(f'⚠️ No se subió nada. {errores} filas con errores de código vacío.', 'danger')
+        elif errores > 0:
+            flash(f'Cargados {contador}. Fallaron {errores} por código vacío.', 'warning')
+        else:
+            flash(f'¡Éxito! Importados {contador} repuestos.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error crítico: {str(e)}', 'danger')
+
+    return redirect(url_for('main.inventario'))

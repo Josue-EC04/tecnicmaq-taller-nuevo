@@ -1,25 +1,22 @@
+# reset_db.py
 from app import create_app, db
-from app.models import Usuario
-from werkzeug.security import generate_password_hash
+from app.models import Usuario, Repuesto # Importa tus modelos para que SQLAlchemy los reconozca
 
 app = create_app()
 
 with app.app_context():
-    # 1. BORRAMOS TODO (Esto elimina el conflicto de la tabla vieja)
-    db.drop_all()
-    print("🗑️ Base de datos antigua borrada.")
-
-    # 2. CREAMOS TODO NUEVO (Con las columnas de precio y costo)
+    print("Creando nueva base de datos...")
     db.create_all()
-    print("✨ Tablas nuevas creadas.")
-
-    # 3. CREAMOS AL ADMIN
-    usuario = "tecnicmaq"
-    password_plano = "tecnicmaqeck4411" 
-    password_segura = generate_password_hash(password_plano)
+    print("¡Base de datos creada exitosamente en la carpeta 'instance'!")
     
-    nuevo_admin = Usuario(nombre="Administrador", username=usuario, password=password_segura)
-    db.session.add(nuevo_admin)
-    db.session.commit()
-    
-    print("✅ Usuario Admin restaurado.")
+    # Opcional: Crear usuario admin por defecto para no quedarte fuera
+    if not Usuario.query.filter_by(username='admin').first():
+        from werkzeug.security import generate_password_hash
+        admin = Usuario(
+            username='admin', 
+            password=generate_password_hash('admin123'), 
+            nombre='Administrador'
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print("Usuario 'admin' creado con contraseña 'admin123'")

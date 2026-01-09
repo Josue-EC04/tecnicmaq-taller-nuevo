@@ -31,9 +31,19 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold text-dark">Inventario de Repuestos</h2>
-    <a href="/agregar" class="btn btn-success shadow-sm">
-        <i class="bi bi-plus-circle"></i> + Nuevo Repuesto
-    </a>
+    
+    <div class="d-flex gap-2">
+        <form action="{{ url_for('main.importar_excel') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
+            <input type="file" name="archivo_excel" class="form-control form-control-sm" accept=".xlsx" required style="width: 200px;">
+            <button type="submit" class="btn btn-warning btn-sm text-dark shadow-sm">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Subir Excel
+            </button>
+        </form>
+
+        <a href="/agregar" class="btn btn-success shadow-sm">
+            <i class="bi bi-plus-circle"></i> + Nuevo Repuesto
+        </a>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-4 border-0 bg-light">
@@ -203,8 +213,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const nombreB = b.getAttribute('data-nombre');
             const precioA = parseFloat(a.getAttribute('data-precio'));
             const precioB = parseFloat(b.getAttribute('data-precio'));
-            const stockA = parseInt(a.getAttribute('data-stock'));
-            const stockB = parseInt(b.getAttribute('data-stock'));
+            const stockA = parseFloat(a.getAttribute('data-stock')); // Usamos parseFloat por si hay decimales
+            const stockB = parseFloat(b.getAttribute('data-stock'));
 
             // Lógica de comparación según lo seleccionado
             switch(criterio) {
@@ -222,7 +232,6 @@ document.addEventListener('DOMContentLoaded', function() {
         filasOrdenadas.forEach(fila => tablaCuerpo.appendChild(fila));
         
         // RE-APLICAR FILTRO DE BÚSQUEDA
-        // (Por si el usuario ordenó mientras tenía una búsqueda escrita)
         const terminoActual = inputBusqueda.value.toLowerCase();
         if(terminoActual !== '') {
             filasOrdenadas.forEach(fila => {

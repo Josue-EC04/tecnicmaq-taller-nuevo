@@ -1,16 +1,14 @@
+# Archivo: setup_db.py
 from app import create_app, db
-from app.models import Repuesto
+import os
 
 app = create_app()
+
 with app.app_context():
-    # Creamos un repuesto de prueba
-    nuevo = Repuesto(
-        codigo="FIL-001", 
-        nombre="Filtro de Aceite", 
-        marca="Bosch", 
-        cantidad=10, 
-        precio=15.50
-    )
-    db.session.add(nuevo)
-    db.session.commit()
-    print("¡Repuesto de prueba creado con éxito!")
+    db_path = os.path.join('instance', 'db.sqlite3')
+    if os.path.exists(db_path):
+        os.remove(db_path) # Borra la vieja si existe
+        print("Base de datos antigua eliminada.")
+        
+    db.create_all() # CREA LA NUEVA con soporte para decimales
+    print("¡Base de datos nueva creada exitosamente!")

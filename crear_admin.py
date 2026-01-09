@@ -12,7 +12,7 @@ with app.app_context():
     db.session.query(Usuario).delete()
     
     # 3. Datos del Admin
-    usuario = "admin"
+    usuario = "tecnicmaq"
     password_plano = "tecnicmaqeck4411" 
     
     # 4. Encriptar y Guardar
