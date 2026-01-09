@@ -16,8 +16,8 @@
         <div class="container">
             <a class="navbar-brand" href="/">
                 <img src="{{ url_for('static', filename='img/logo.png') }}" 
-                    alt="Tecnicmaq ECK" 
-                    height="50"> 
+                     alt="Tecnicmaq ECK" 
+                     height="50"> 
             </a>
 
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -66,95 +66,132 @@
     </nav>
 
     <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         {% block content %}{% endblock %}
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-   
     <div id="chat-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
     
-    <div id="chat-window" class="card shadow" style="width: 300px; display: none; margin-bottom: 10px;">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <small>🤖 Asistente TecnicMaq</small>
-            <button onclick="toggleChat()" class="btn btn-sm btn-link text-white p-0">X</button>
-        </div>
-        <div class="card-body p-2">
-            <div id="chat-messages" style="height: 250px; overflow-y: auto; font-size: 0.9rem;" class="mb-2 bg-light border p-2 rounded">
-                <div class="text-muted small text-center">Di "hola", "buscar bujia" o "nuevo: codigo, nombre, precio, stock"</div>
+        <div id="chat-window" class="card shadow" style="width: 300px; display: none; margin-bottom: 10px;">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <small>🤖 Asistente TecnicMaq</small>
+                <button onclick="toggleChat()" class="btn btn-sm btn-link text-white p-0">X</button>
             </div>
-            <div class="input-group">
-                <input type="text" id="chat-input" class="form-control form-control-sm" placeholder="Escribe aquí...">
-                <button onclick="enviarMensaje()" class="btn btn-primary btn-sm">Enviar</button>
+            <div class="card-body p-2">
+                <div id="chat-messages" style="height: 250px; overflow-y: auto; font-size: 0.9rem;" class="mb-2 bg-light border p-2 rounded">
+                    <div class="text-muted small text-center">Di "hola", "buscar bujia" o "nuevo: codigo, nombre, precio, stock"</div>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="chat-input" class="form-control form-control-sm" placeholder="Escribe aquí...">
+                    <button onclick="enviarMensaje()" class="btn btn-primary btn-sm">Enviar</button>
+                </div>
             </div>
         </div>
+
+        <button onclick="toggleChat()" class="btn btn-primary rounded-circle shadow p-3" style="width: 60px; height: 60px;">
+            <i class="bi bi-chat-dots-fill fs-4"></i>
+        </button>
     </div>
 
-    <button onclick="toggleChat()" class="btn btn-primary rounded-circle shadow p-3" style="width: 60px; height: 60px;">
-        <i class="bi bi-chat-dots-fill fs-4"></i>
-    </button>
-</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-<script>
-    function toggleChat() {
-        const chatWindow = document.getElementById('chat-window');
-        if (chatWindow.style.display === 'none') {
-            chatWindow.style.display = 'block';
-            document.getElementById('chat-input').focus();
-        } else {
-            chatWindow.style.display = 'none';
+    <script>
+        // --- LÓGICA DEL CHATBOT ---
+        function toggleChat() {
+            const chatWindow = document.getElementById('chat-window');
+            if (chatWindow.style.display === 'none') {
+                chatWindow.style.display = 'block';
+                document.getElementById('chat-input').focus();
+            } else {
+                chatWindow.style.display = 'none';
+            }
         }
-    }
 
-    document.getElementById('chat-input').addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') enviarMensaje();
-    });
-
-    function enviarMensaje() {
-        const input = document.getElementById('chat-input');
-        const mensaje = input.value.trim();
-        if (mensaje === "") return;
-
-        // 1. Mostrar mi mensaje
-        agregarGlobo(mensaje, 'user');
-        input.value = '';
-
-        // 2. Enviar al Backend
-        fetch('/chatbot', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mensaje: mensaje})
-        })
-        .then(response => response.json())
-        .then(data => {
-            // 3. Mostrar respuesta del Bot
-            agregarGlobo(data.respuesta, 'bot');
-        })
-        .catch(error => {
-            agregarGlobo("Error de conexión ❌", 'bot');
+        document.getElementById('chat-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') enviarMensaje();
         });
-    }
 
-    function agregarGlobo(texto, tipo) {
-        const chatMessages = document.getElementById('chat-messages');
-        const div = document.createElement('div');
-        
-        div.style.marginBottom = '8px';
-        div.style.padding = '8px';
-        div.style.borderRadius = '10px';
-        div.style.maxWidth = '80%';
-        div.style.whiteSpace = 'pre-line'; // Para respetar los saltos de línea
+        function enviarMensaje() {
+            const input = document.getElementById('chat-input');
+            const mensaje = input.value.trim();
+            if (mensaje === "") return;
 
-        if (tipo === 'user') {
-            div.className = 'bg-primary text-white ms-auto'; // Alineado a derecha
-            div.style.textAlign = 'right';
-        } else {
-            div.className = 'bg-white border text-dark me-auto'; // Alineado a izquierda
+            // 1. Mostrar mi mensaje
+            agregarGlobo(mensaje, 'user');
+            input.value = '';
+
+            // 2. Enviar al Backend
+            fetch('/chatbot', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mensaje: mensaje})
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 3. Mostrar respuesta del Bot
+                agregarGlobo(data.respuesta, 'bot');
+            })
+            .catch(error => {
+                agregarGlobo("Error de conexión ❌", 'bot');
+            });
         }
 
-        div.innerText = texto;
-        chatMessages.appendChild(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll al final
-    }
-</script>
+        function agregarGlobo(texto, tipo) {
+            const chatMessages = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            
+            div.style.marginBottom = '8px';
+            div.style.padding = '8px';
+            div.style.borderRadius = '10px';
+            div.style.maxWidth = '80%';
+            div.style.whiteSpace = 'pre-line'; 
+
+            if (tipo === 'user') {
+                div.className = 'bg-primary text-white ms-auto'; 
+                div.style.textAlign = 'right';
+            } else {
+                div.className = 'bg-white border text-dark me-auto'; 
+            }
+
+            div.innerText = texto;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight; 
+        }
+
+        // --- LÓGICA ANTI DOBLE-CLIC (EVITAR VENTAS DOBLES) ---
+        document.addEventListener("DOMContentLoaded", function() {
+            var forms = document.querySelectorAll('form');
+            forms.forEach(function(form) {
+                form.addEventListener('submit', function(event) {
+                    // Evitamos bloquear el chat o formularios de búsqueda rápida si los hubiera
+                    if (form.getAttribute('action') !== '/chatbot') {
+                        var btn = form.querySelector('button[type="submit"]');
+                        if (btn) {
+                            btn.disabled = true; // Desactivar botón
+                            var originalText = btn.innerHTML;
+                            // Cambiar texto a "Procesando..."
+                            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+                            
+                            // Restaurar después de 10s por seguridad si algo falla
+                            setTimeout(function() {
+                                btn.disabled = false;
+                                btn.innerHTML = originalText;
+                            }, 10000); 
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
