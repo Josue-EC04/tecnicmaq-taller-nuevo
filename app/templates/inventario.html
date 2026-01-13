@@ -10,13 +10,19 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold text-dark">Inventario</h2>
     <div class="d-flex gap-2 align-items-center">
+        <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-primary btn-sm shadow-sm">
+            <i class="bi bi-download"></i> Descargar Excel
+        </a>
+
         <form action="{{ url_for('main.importar_excel') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
             <input type="file" name="archivo_excel" class="form-control form-control-sm" accept=".xlsx, .xls" required style="width: 200px;">
-            <button type="submit" class="btn btn-warning btn-sm text-dark shadow-sm"><i class="bi bi-file-earmark-spreadsheet"></i> Subir Excel</button>
+            <button type="submit" class="btn btn-warning btn-sm text-dark shadow-sm"><i class="bi bi-file-earmark-spreadsheet"></i> Subir</button>
         </form>
+
         {% if session.get('ultimo_lote_id') %}
             <a href="{{ url_for('main.deshacer_carga') }}" class="btn btn-outline-danger btn-sm shadow-sm animate-pulse"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</a>
         {% endif %}
+        
         <a href="/agregar" class="btn btn-success shadow-sm"><i class="bi bi-plus-circle"></i> + Nuevo</a>
     </div>
 </div>
@@ -27,16 +33,22 @@
             <div class="col-md-8">
                 <div class="input-group">
                     <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                    <input type="text" name="q" value="{{ busqueda if busqueda else '' }}" class="form-control form-control-lg border-start-0" placeholder="Buscar...">
-                    {% if busqueda %}<a href="{{ url_for('main.inventario') }}" class="btn btn-outline-secondary">X</a>{% endif %}
+                    <input type="text" name="q" value="{{ busqueda }}" class="form-control form-control-lg border-start-0" placeholder="Buscar...">
+                    <button type="submit" class="btn btn-outline-secondary">Buscar</button>
+                    {% if busqueda or orden_actual != 'defecto' %}
+                        <a href="{{ url_for('main.inventario') }}" class="btn btn-outline-danger">Limpiar</a>
+                    {% endif %}
                 </div>
             </div>
             <div class="col-md-4">
-                <select id="selectOrden" class="form-select form-select-lg">
-                    <option value="defecto">📅 Recientes</option>
-                    <option value="nombre_asc">🔤 Nombre (A-Z)</option>
-                    <option value="precio_alto">💲 Precio (Alto-Bajo)</option>
-                    <option value="stock_bajo">⚠️ Stock (Bajo-Alto)</option>
+                <select name="orden" class="form-select form-select-lg" onchange="this.form.submit()">
+                    <option value="defecto" {% if orden_actual == 'defecto' %}selected{% endif %}>📅 Recientes</option>
+                    <option value="nombre_asc" {% if orden_actual == 'nombre_asc' %}selected{% endif %}>🔤 Nombre (A-Z)</option>
+                    <option value="nombre_desc" {% if orden_actual == 'nombre_desc' %}selected{% endif %}>🔤 Nombre (Z-A)</option>
+                    <option value="precio_alto" {% if orden_actual == 'precio_alto' %}selected{% endif %}>💲 Precio (Alto-Bajo)</option>
+                    <option value="precio_bajo" {% if orden_actual == 'precio_bajo' %}selected{% endif %}>💲 Precio (Bajo-Alto)</option>
+                    <option value="stock_bajo" {% if orden_actual == 'stock_bajo' %}selected{% endif %}>⚠️ Stock (Bajo-Alto)</option>
+                    <option value="stock_alto" {% if orden_actual == 'stock_alto' %}selected{% endif %}>📦 Stock (Alto-Bajo)</option>
                 </select>
             </div>
         </form>
@@ -50,9 +62,9 @@
                 <thead class="table-dark small text-uppercase">
                     <tr><th>Foto</th><th>Código</th><th>Nombre / Marca</th><th class="text-center">Stock</th><th>Costo</th><th>P. Venta</th><th>Margen</th><th class="text-end">Acciones</th></tr>
                 </thead>
-                <tbody id="tablaCuerpo">
+                <tbody>
                     {% for r in repuestos %}
-                    <tr class="fila-producto" data-nombre="{{ r.nombre|lower }} {{ r.marca|lower }}" data-precio="{{ r.precio }}" data-stock="{{ r.cantidad }}">
+                    <tr>
                         <td class="text-center"><img src="{{ url_for('static', filename='uploads/' + r.imagen_filename) }}" class="img-zoom"></td>
                         <td class="fw-bold text-primary">{{ r.codigo }}</td>
                         <td><div class="fw-bold">{{ r.nombre }}</div><small class="text-muted">{{ r.marca }}</small></td>
@@ -74,40 +86,27 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8" class="text-center py-5">No hay repuestos.</td></tr>
+                    <tr><td colspan="8" class="text-center py-5">No hay repuestos que coincidan.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+    
     <div class="card-footer bg-white border-top-0 py-3">
         <nav>
             <ul class="pagination justify-content-center mb-0">
-                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda) }}">Anterior</a></li>
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
+                </li>
+                
                 <li class="page-item disabled"><span class="page-link">Página {{ pagination.page }} de {{ pagination.pages }}</span></li>
-                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda) }}">Siguiente</a></li>
+                
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>
+                </li>
             </ul>
         </nav>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const selectOrden = document.getElementById('selectOrden');
-    const tablaCuerpo = document.getElementById('tablaCuerpo');
-    let filas = Array.from(tablaCuerpo.getElementsByClassName('fila-producto'));
-
-    selectOrden.addEventListener('change', function(e) {
-        if(e.target.value === 'defecto') { window.location.reload(); return; }
-        const filasOrdenadas = filas.sort((a, b) => {
-            const valA = parseFloat(a.getAttribute(e.target.value.includes('precio') ? 'data-precio' : 'data-stock'));
-            const valB = parseFloat(b.getAttribute(e.target.value.includes('precio') ? 'data-precio' : 'data-stock'));
-            if(e.target.value.includes('nombre')) return a.getAttribute('data-nombre').localeCompare(b.getAttribute('data-nombre'));
-            return e.target.value.includes('alto') || e.target.value.includes('nombre_desc') ? valB - valA : valA - valB;
-        });
-        tablaCuerpo.innerHTML = '';
-        filasOrdenadas.forEach(fila => tablaCuerpo.appendChild(fila));
-    });
-});
-</script>
 {% endblock %}

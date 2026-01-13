@@ -3,6 +3,7 @@ import uuid
 import secrets
 import json
 import pandas as pd
+import io 
 import google.generativeai as genai
 from datetime import datetime
 from collections import defaultdict
@@ -39,12 +40,9 @@ def dashboard():
     if not current_user.is_authenticated:
         return redirect(url_for('main.login'))
     
-    # CÁLCULO OPTIMIZADO
     total_tipos = Repuesto.query.count()
     alertas_stock = Repuesto.query.filter(Repuesto.cantidad < 5).count()
     total_reservas = Reserva.query.count()
-    
-    # Suma directa en base de datos
     total_valor = db.session.query(func.sum(Repuesto.costo * Repuesto.cantidad)).scalar()
     valor_inventario = total_valor if total_valor else 0
 
@@ -57,26 +55,91 @@ def dashboard():
 @main.route('/inventario')
 @login_required
 def inventario():
-    # PAGINACIÓN (20 por página)
+    # Parámetros de la URL
     page = request.args.get('page', 1, type=int)
     per_page = 20
-    busqueda = request.args.get('q')
+    busqueda = request.args.get('q', '')
+    orden = request.args.get('orden', 'defecto') # Nuevo parámetro de orden
     
     query = Repuesto.query
 
+    # 1. FILTRO DE BÚSQUEDA
     if busqueda:
         query = query.filter(
             (Repuesto.nombre.ilike(f'%{busqueda}%')) | 
-            (Repuesto.codigo.ilike(f'%{busqueda}%'))
+            (Repuesto.codigo.ilike(f'%{busqueda}%')) |
+            (Repuesto.marca.ilike(f'%{busqueda}%'))
         )
     
+    # 2. ORDENAMIENTO (En el Servidor)
+    if orden == 'nombre_asc':
+        query = query.order_by(Repuesto.nombre.asc())
+    elif orden == 'nombre_desc':
+        query = query.order_by(Repuesto.nombre.desc())
+    elif orden == 'precio_alto':
+        query = query.order_by(Repuesto.precio.desc())
+    elif orden == 'precio_bajo':
+        query = query.order_by(Repuesto.precio.asc())
+    elif orden == 'stock_bajo':
+        query = query.order_by(Repuesto.cantidad.asc())
+    elif orden == 'stock_alto':
+        query = query.order_by(Repuesto.cantidad.desc())
+    else:
+        # Por defecto: los últimos agregados primero (por ID o fecha)
+        query = query.order_by(Repuesto.id.desc())
+
+    # 3. PAGINACIÓN
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     repuestos = pagination.items
 
     return render_template('inventario.html', 
                            repuestos=repuestos, 
                            pagination=pagination,
-                           busqueda=busqueda)
+                           busqueda=busqueda,
+                           orden_actual=orden)
+
+# --- NUEVA RUTA: DESCARGAR EXCEL ---
+@main.route('/exportar_excel')
+@login_required
+def exportar_excel():
+    try:
+        # 1. Consultamos TODOS los repuestos
+        repuestos = Repuesto.query.all()
+        
+        # 2. Creamos una lista de diccionarios
+        data = []
+        for r in repuestos:
+            data.append({
+                'Codigo': r.codigo,
+                'Nombre': r.nombre,
+                'Marca': r.marca,
+                'Stock': r.cantidad,
+                'Costo_Compra': r.costo,
+                'Precio_Venta': r.precio
+            })
+            
+        # 3. Creamos el DataFrame de Pandas
+        df = pd.read_json(json.dumps(data)) if data else pd.DataFrame(columns=['Codigo', 'Nombre', 'Marca', 'Stock', 'Costo_Compra', 'Precio_Venta'])
+        
+        # 4. Guardamos en memoria (Buffer) en lugar de archivo físico
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Inventario')
+            
+        output.seek(0)
+        
+        # 5. Enviamos el archivo al navegador
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'Inventario_Tecnicmaq_{datetime.now().strftime("%Y%m%d")}.xlsx'
+        )
+
+    except Exception as e:
+        flash(f'Error al exportar: {str(e)}', 'danger')
+        return redirect(url_for('main.inventario'))
+
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
@@ -86,7 +149,6 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
         usuario_db = Usuario.query.filter_by(username=username).first()
         
         if usuario_db and check_password_hash(usuario_db.password, password):
@@ -111,9 +173,7 @@ def agregar():
         codigo = request.form.get('codigo')
         nombre = request.form.get('nombre')
         marca = request.form.get('marca')
-        
         try:
-            # STOCK COMO ENTERO
             cantidad = int(request.form.get('cantidad') or 0)
             costo = float(request.form.get('costo') or 0)
             precio = float(request.form.get('precio') or 0)
@@ -123,8 +183,7 @@ def agregar():
 
         file = request.files.get('imagen')
         filename = guardar_imagen(file)
-        if not filename:
-            filename = 'default.jpg'
+        if not filename: filename = 'default.jpg'
 
         if Repuesto.query.filter_by(codigo=codigo).first():
             flash('¡Error! Ya existe un repuesto con ese código.', 'danger')
@@ -135,10 +194,8 @@ def agregar():
             cantidad=cantidad, costo=costo, precio=precio,
             imagen_filename=filename
         )
-
         db.session.add(nuevo_repuesto)
         db.session.commit()
-
         flash('Repuesto agregado exitosamente.', 'success')
         return redirect(url_for('main.inventario'))
 
@@ -148,12 +205,10 @@ def agregar():
 @login_required
 def editar(id):
     repuesto = Repuesto.query.get_or_404(id)
-    
     if request.method == 'POST':
         repuesto.codigo = request.form.get('codigo')
         repuesto.nombre = request.form.get('nombre')
         repuesto.marca = request.form.get('marca')
-        
         try:
             repuesto.cantidad = int(request.form.get('cantidad') or 0)
             repuesto.costo = float(request.form.get('costo') or 0)
@@ -165,13 +220,11 @@ def editar(id):
         imagen = request.files.get('imagen')
         if imagen and imagen.filename != '':
             filename = guardar_imagen(imagen)
-            if filename:
-                repuesto.imagen_filename = filename
+            if filename: repuesto.imagen_filename = filename
             
         db.session.commit()
         flash('Repuesto actualizado correctamente', 'success')
         return redirect(url_for('main.inventario'))
-        
     return render_template('editar.html', repuesto=repuesto)
 
 @main.route('/eliminar/<int:id>')
@@ -187,7 +240,6 @@ def eliminar(id):
 @login_required
 def vender_producto(id):
     repuesto = Repuesto.query.get_or_404(id)
-    
     if request.method == 'POST':
         try:
             cantidad = int(request.form.get('cantidad') or 0)
@@ -201,24 +253,17 @@ def vender_producto(id):
             
         total_pagar = repuesto.precio * cantidad
         ganancia = (repuesto.precio - repuesto.costo) * cantidad
-        
         repuesto.cantidad -= cantidad
         
         nueva_venta = Venta(
-            cantidad=cantidad,
-            precio_unitario=repuesto.precio,
-            costo_unitario=repuesto.costo,
-            ganancia_total=ganancia,
-            repuesto_nombre=repuesto.nombre,
-            repuesto_codigo=repuesto.codigo
+            cantidad=cantidad, precio_unitario=repuesto.precio,
+            costo_unitario=repuesto.costo, ganancia_total=ganancia,
+            repuesto_nombre=repuesto.nombre, repuesto_codigo=repuesto.codigo
         )
-        
         db.session.add(nueva_venta)
         db.session.commit()
-        
         flash(f'¡Venta registrada! Ingreso: S/{total_pagar:.2f}', 'success')
         return redirect(url_for('main.inventario'))
-        
     return render_template('form_venta.html', repuesto=repuesto)
 
 @main.route('/reservas')
@@ -231,7 +276,6 @@ def lista_reservas():
 @login_required
 def crear_reserva(id):
     repuesto = Repuesto.query.get_or_404(id)
-    
     if request.method == 'POST':
         cliente = request.form.get('cliente')
         telefono = request.form.get('telefono')
@@ -246,15 +290,11 @@ def crear_reserva(id):
             return redirect(url_for('main.crear_reserva', id=id))
             
         repuesto.cantidad -= cantidad
-        nueva_reserva = Reserva(
-            cliente=cliente, telefono=telefono, cantidad=cantidad, repuesto=repuesto
-        )
-        
+        nueva_reserva = Reserva(cliente=cliente, telefono=telefono, cantidad=cantidad, repuesto=repuesto)
         db.session.add(nueva_reserva)
         db.session.commit()
         flash(f'¡Reserva creada para {cliente}!', 'success')
         return redirect(url_for('main.lista_reservas'))
-        
     return render_template('form_reserva.html', repuesto=repuesto)
 
 @main.route('/gestion_reserva/<int:id>/<accion>')
@@ -262,20 +302,15 @@ def crear_reserva(id):
 def gestion_reserva(id, accion):
     reserva = Reserva.query.get_or_404(id)
     repuesto = reserva.repuesto 
-    
     if accion == 'confirmar':
         db.session.delete(reserva)
         db.session.commit()
         flash('Venta completada desde reserva.', 'success')
     elif accion == 'cancelar':
-        if repuesto:
-            repuesto.cantidad += reserva.cantidad
-        else:
-            flash('El producto original ya no existe, pero se borró la reserva.', 'warning')
+        if repuesto: repuesto.cantidad += reserva.cantidad
         db.session.delete(reserva)
         db.session.commit()
         flash('Reserva cancelada. Stock devuelto.', 'warning')
-        
     return redirect(url_for('main.lista_reservas'))
 
 @main.route('/historial-ventas')
@@ -285,20 +320,15 @@ def historial_ventas():
     nombres_meses = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio', 
                      7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
     historial_agrupado = {}
-
     for venta in ventas:
         clave = f"{nombres_meses[venta.fecha.month]} {venta.fecha.year}"
         if clave not in historial_agrupado:
             historial_agrupado[clave] = {'ventas': [], 'suma_ingresos': 0, 'suma_ganancia': 0}
-        
         historial_agrupado[clave]['ventas'].append(venta)
         historial_agrupado[clave]['suma_ingresos'] += venta.precio_unitario * venta.cantidad
         historial_agrupado[clave]['suma_ganancia'] += venta.ganancia_total
-
     total_ganancia_global = sum(v.ganancia_total for v in ventas)
-    return render_template('reporte_ventas.html', 
-                           historial_agrupado=historial_agrupado, 
-                           total_ganancia_global=total_ganancia_global)
+    return render_template('reporte_ventas.html', historial_agrupado=historial_agrupado, total_ganancia_global=total_ganancia_global)
 
 @main.route('/eliminar_venta/<int:id>', methods=['POST'])
 @login_required
@@ -311,31 +341,13 @@ def eliminar_venta(id):
 @main.route('/backup')
 @login_required
 def descargar_backup():
-    usuarios = Usuario.query.all()
-    repuestos = Repuesto.query.all()
-    ventas = Venta.query.all()
-    reservas = Reserva.query.all()
+    usuarios = Usuario.query.all(); repuestos = Repuesto.query.all(); ventas = Venta.query.all(); reservas = Reserva.query.all()
     data = {'usuarios': [], 'repuestos': [], 'ventas': [], 'reservas': []}
-
-    for u in usuarios:
-        data['usuarios'].append({'username': u.username, 'password_hash': u.password, 'nombre': u.nombre})
-    for r in repuestos:
-        data['repuestos'].append({
-            'codigo': r.codigo, 'nombre': r.nombre, 'marca': r.marca, 
-            'cantidad': r.cantidad, 'costo': r.costo, 'precio': r.precio, 
-            'imagen_filename': r.imagen_filename
-        })
-    for v in ventas:
-        data['ventas'].append({
-            'fecha': v.fecha.strftime('%Y-%m-%d %H:%M:%S'), 'cantidad': v.cantidad, 
-            'precio_unitario': v.precio_unitario, 'costo_unitario': v.costo_unitario, 
-            'ganancia_total': v.ganancia_total, 'repuesto_nombre': v.repuesto_nombre, 
-            'repuesto_codigo': v.repuesto_codigo
-        })
-    for res in reservas:
-        if res.repuesto:
-            data['reservas'].append({'cliente': res.cliente, 'telefono': res.telefono, 
-                                    'cantidad': res.cantidad, 'repuesto_codigo': res.repuesto.codigo})
+    for u in usuarios: data['usuarios'].append({'username': u.username, 'password_hash': u.password, 'nombre': u.nombre})
+    for r in repuestos: data['repuestos'].append({'codigo': r.codigo, 'nombre': r.nombre, 'marca': r.marca, 'cantidad': r.cantidad, 'costo': r.costo, 'precio': r.precio, 'imagen_filename': r.imagen_filename})
+    for v in ventas: data['ventas'].append({'fecha': v.fecha.strftime('%Y-%m-%d %H:%M:%S'), 'cantidad': v.cantidad, 'precio_unitario': v.precio_unitario, 'costo_unitario': v.costo_unitario, 'ganancia_total': v.ganancia_total, 'repuesto_nombre': v.repuesto_nombre, 'repuesto_codigo': v.repuesto_codigo})
+    for res in reservas: 
+        if res.repuesto: data['reservas'].append({'cliente': res.cliente, 'telefono': res.telefono, 'cantidad': res.cantidad, 'repuesto_codigo': res.repuesto.codigo})
     
     json_str = json.dumps(data, indent=4)
     response = Response(json_str, mimetype='application/json')
@@ -344,9 +356,7 @@ def descargar_backup():
 
 @main.route('/restaurar', methods=['GET', 'POST'])
 def subir_backup():
-    if Usuario.query.first() and not current_user.is_authenticated:
-        return redirect(url_for('main.login'))
-
+    if Usuario.query.first() and not current_user.is_authenticated: return redirect(url_for('main.login'))
     if request.method == 'POST':
         file = request.files['archivo']
         if file:
@@ -357,27 +367,15 @@ def subir_backup():
                         db.session.add(Usuario(username=u_data['username'], password=u_data['password_hash'], nombre=u_data['nombre']))
                 for r_data in data.get('repuestos', []):
                     if not Repuesto.query.filter_by(codigo=r_data['codigo']).first():
-                        db.session.add(Repuesto(
-                            codigo=r_data['codigo'], nombre=r_data['nombre'], marca=r_data['marca'],
-                            cantidad=int(r_data['cantidad']), costo=r_data['costo'], precio=r_data['precio'],
-                            imagen_filename=r_data.get('imagen_filename', 'default.jpg')
-                        ))
+                        db.session.add(Repuesto(codigo=r_data['codigo'], nombre=r_data['nombre'], marca=r_data['marca'], cantidad=int(r_data['cantidad']), costo=r_data['costo'], precio=r_data['precio'], imagen_filename=r_data.get('imagen_filename', 'default.jpg')))
                 for v_data in data.get('ventas', []):
-                    db.session.add(Venta(
-                        fecha=datetime.strptime(v_data['fecha'], '%Y-%m-%d %H:%M:%S'),
-                        cantidad=int(v_data['cantidad']), precio_unitario=v_data['precio_unitario'],
-                        costo_unitario=v_data['costo_unitario'], ganancia_total=v_data['ganancia_total'],
-                        repuesto_nombre=v_data['repuesto_nombre'], repuesto_codigo=v_data['repuesto_codigo']
-                    ))
+                    db.session.add(Venta(fecha=datetime.strptime(v_data['fecha'], '%Y-%m-%d %H:%M:%S'), cantidad=int(v_data['cantidad']), precio_unitario=v_data['precio_unitario'], costo_unitario=v_data['costo_unitario'], ganancia_total=v_data['ganancia_total'], repuesto_nombre=v_data['repuesto_nombre'], repuesto_codigo=v_data['repuesto_codigo']))
                 db.session.commit()
                 flash('¡Base de datos restaurada exitosamente!', 'success')
                 return redirect(url_for('main.dashboard'))
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Error al procesar el archivo: {str(e)}', 'danger')
+            except Exception as e: db.session.rollback(); flash(f'Error al procesar el archivo: {str(e)}', 'danger')
     return render_template('restaurar.html')
 
-# --- CHATBOT ---
 @main.route('/chatbot', methods=['POST'])
 @login_required
 def chatbot_responde():
@@ -385,116 +383,69 @@ def chatbot_responde():
     mensaje_usuario = data.get('mensaje', '')
     historial = session.get('historial_chat', [])
     contexto_previo = "".join([f"- {msg['role']}: {msg['text']}\n" for msg in historial])
-
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key: return jsonify({'respuesta': '⚠️ Error: Falta API Key de Google.'})
     
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-2.0-flash')
-
-    instruccion_sistema = f"""
-    Eres el asistente inteligente de 'Tecnicmaq'. HISTORIAL: {contexto_previo} USUARIO: "{mensaje_usuario}"
-    TU MISIÓN: Responde inventario con COMANDOS. Charla normal si no hay comandos.
-    COMANDOS: 1. COMANDO_ANALISIS|CLAVE 2. COMANDO_BUSCAR|termino 3. COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK
-    """
+    instruccion_sistema = f"Eres el asistente de 'Tecnicmaq'. HISTORIAL: {contexto_previo} USUARIO: '{mensaje_usuario}'. COMANDOS: COMANDO_ANALISIS|CLAVE, COMANDO_BUSCAR|termino, COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK. Responde natural si no hay comandos."
     try:
         response = model.generate_content(instruccion_sistema)
         respuesta_ia = response.text.strip()
-        respuesta_final = respuesta_ia 
-
+        respuesta_final = respuesta_ia
         if "COMANDO_ANALISIS|" in respuesta_ia:
             clave = respuesta_ia.replace("COMANDO_ANALISIS|", "").strip()
-            resultados = []
-            if clave == 'MAX_STOCK': resultados = Repuesto.query.order_by(Repuesto.cantidad.desc()).limit(3).all()
-            elif clave == 'MIN_STOCK': resultados = Repuesto.query.order_by(Repuesto.cantidad.asc()).limit(3).all()
-            elif clave == 'MAX_PRECIO': resultados = Repuesto.query.order_by(Repuesto.precio.desc()).limit(3).all()
-            elif clave == 'MIN_PRECIO': resultados = Repuesto.query.order_by(Repuesto.precio.asc()).limit(3).all()
-            
-            respuesta_final = "El inventario está vacío."
-            if resultados:
-                respuesta_final = f"📊 Top 3 productos:\n"
-                for r in resultados: respuesta_final += f"🥇 {r.nombre} | Stock: {r.cantidad} | S/{r.precio}\n"
-
+            res = []
+            if clave == 'MAX_STOCK': res = Repuesto.query.order_by(Repuesto.cantidad.desc()).limit(3).all()
+            elif clave == 'MIN_STOCK': res = Repuesto.query.order_by(Repuesto.cantidad.asc()).limit(3).all()
+            elif clave == 'MAX_PRECIO': res = Repuesto.query.order_by(Repuesto.precio.desc()).limit(3).all()
+            elif clave == 'MIN_PRECIO': res = Repuesto.query.order_by(Repuesto.precio.asc()).limit(3).all()
+            respuesta_final = "Inventario vacío." if not res else "📊 Top 3:\n" + "\n".join([f"🥇 {r.nombre} | Stock: {r.cantidad} | S/{r.precio}" for r in res])
         elif "COMANDO_BUSCAR|" in respuesta_ia:
-            termino = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip().lower()
-            query = Repuesto.query
-            if "stock 0" in termino: resultados = query.filter(Repuesto.cantidad == 0).all()
-            elif "stock 1" in termino: resultados = query.filter(Repuesto.cantidad <= 1).all()
-            else: resultados = query.filter((Repuesto.nombre.ilike(f'%{termino}%')) | (Repuesto.codigo.ilike(f'%{termino}%'))).all()
-            
-            respuesta_final = f"❌ No encontré nada para '{termino}'."
-            if resultados:
-                respuesta_final = f"🔍 Encontré estos productos:\n"
-                for r in resultados: respuesta_final += f"• {r.nombre} | Stock: {r.cantidad} | S/{r.precio}\n"
-
+            t = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip().lower()
+            q = Repuesto.query
+            if "stock 0" in t: res = q.filter(Repuesto.cantidad == 0).all()
+            elif "stock 1" in t: res = q.filter(Repuesto.cantidad <= 1).all()
+            else: res = q.filter((Repuesto.nombre.ilike(f'%{t}%')) | (Repuesto.codigo.ilike(f'%{t}%'))).all()
+            respuesta_final = f"❌ Nada para '{t}'." if not res else "🔍 Encontré:\n" + "\n".join([f"• {r.nombre} | Stock: {r.cantidad} | S/{r.precio}" for r in res])
         elif "COMANDO_CREAR|" in respuesta_ia:
-            datos = respuesta_ia.replace("COMANDO_CREAR|", "").split('|')
-            if len(datos) >= 4 and not Repuesto.query.filter_by(codigo=datos[0]).first():
-                db.session.add(Repuesto(codigo=datos[0], nombre=datos[1], precio=float(datos[2]), cantidad=int(datos[3]), marca="Generico IA", costo=float(datos[2])*0.7))
-                db.session.commit()
-                respuesta_final = f"✅ Agregado: {datos[1]} a S/{datos[2]}"
-            else: respuesta_final = "⚠️ Error: Faltan datos o código duplicado."
+            d = respuesta_ia.replace("COMANDO_CREAR|", "").split('|')
+            if len(d) >= 4 and not Repuesto.query.filter_by(codigo=d[0]).first():
+                db.session.add(Repuesto(codigo=d[0], nombre=d[1], precio=float(d[2]), cantidad=int(d[3]), marca="Generico IA", costo=float(d[2])*0.7))
+                db.session.commit(); respuesta_final = f"✅ Agregado: {d[1]} a S/{d[2]}"
+            else: respuesta_final = "⚠️ Error datos/duplicado."
+        historial.append({"role": "Usuario", "text": mensaje_usuario}); historial.append({"role": "Bot", "text": respuesta_final})
+        session['historial_chat'] = historial[-6:]; return jsonify({'respuesta': respuesta_final})
+    except: return jsonify({'respuesta': "😵 Error IA."})
 
-        historial.append({"role": "Usuario", "text": mensaje_usuario})
-        historial.append({"role": "Bot", "text": respuesta_final})
-        session['historial_chat'] = historial[-6:]
-        return jsonify({'respuesta': respuesta_final})
-    except Exception as e: return jsonify({'respuesta': "😵 Error de conexión."})
-
-# --- IMPORTAR EXCEL (CON DESHACER) ---
 @main.route('/importar_excel', methods=['POST'])
 @login_required
 def importar_excel():
     if 'archivo_excel' not in request.files: return redirect(url_for('main.inventario'))
     archivo = request.files['archivo_excel']
     if archivo.filename == '': return redirect(url_for('main.inventario'))
-
     try:
         df = pd.read_excel(archivo, dtype={'Codigo': str})
         df.columns = df.columns.str.strip()
-        cols_requeridas = ['Codigo', 'Nombre', 'Marca', 'Stock', 'Costo_Compra', 'Precio_Venta']
-        if any(col not in df.columns for col in cols_requeridas):
-            flash('Error: Columnas incorrectas.', 'danger')
-            return redirect(url_for('main.inventario'))
-
-        contador, errores = 0, 0
-        lote_actual = str(uuid.uuid4()) # ID para deshacer
-
+        contador, errores, lote_actual = 0, 0, str(uuid.uuid4())
         for _, row in df.iterrows():
-            raw_codigo = str(row['Codigo']).strip()
-            if not raw_codigo or raw_codigo.lower() == 'nan' or Repuesto.query.filter_by(codigo=raw_codigo).first():
-                errores += 1; continue
-            
+            cod = str(row['Codigo']).strip()
+            if not cod or cod.lower() == 'nan' or Repuesto.query.filter_by(codigo=cod).first(): errores += 1; continue
             try:
-                db.session.add(Repuesto(
-                    codigo=raw_codigo, nombre=row['Nombre'], marca=row['Marca'] if pd.notna(row['Marca']) else "Genérico",
-                    cantidad=int(float(row['Stock'] if pd.notna(row['Stock']) else 0)),
-                    costo=float(row['Costo_Compra'] if pd.notna(row['Costo_Compra']) else 0),
-                    precio=float(row['Precio_Venta'] if pd.notna(row['Precio_Venta']) else 0),
-                    lote_id=lote_actual
-                ))
+                db.session.add(Repuesto(codigo=cod, nombre=row['Nombre'], marca=row['Marca'] if pd.notna(row['Marca']) else "Genérico", cantidad=int(float(row['Stock'] if pd.notna(row['Stock']) else 0)), costo=float(row['Costo_Compra'] if pd.notna(row['Costo_Compra']) else 0), precio=float(row['Precio_Venta'] if pd.notna(row['Precio_Venta']) else 0), lote_id=lote_actual))
                 contador += 1
             except: errores += 1
-        
         db.session.commit()
-        if contador > 0:
-            session['ultimo_lote_id'] = lote_actual
-            flash(f'¡Éxito! Importados {contador}. Usa "Deshacer" si te equivocaste.', 'success')
-        if errores > 0: flash(f'{errores} filas fallaron (códigos vacíos o duplicados).', 'warning')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error crítico: {str(e)}', 'danger')
+        if contador > 0: session['ultimo_lote_id'] = lote_actual; flash(f'Importados {contador}.', 'success')
+        if errores > 0: flash(f'{errores} fallaron.', 'warning')
+    except Exception as e: db.session.rollback(); flash(f'Error: {str(e)}', 'danger')
     return redirect(url_for('main.inventario'))
 
 @main.route('/deshacer_carga')
 @login_required
 def deshacer_carga():
     lote_id = session.get('ultimo_lote_id')
-    if not lote_id: return redirect(url_for('main.inventario'))
-    try:
-        borrados = Repuesto.query.filter_by(lote_id=lote_id).delete()
-        db.session.commit()
-        session.pop('ultimo_lote_id', None)
-        flash(f'⏮️ Se eliminaron {borrados} productos de la última carga.', 'info')
-    except: db.session.rollback()
+    if lote_id:
+        Repuesto.query.filter_by(lote_id=lote_id).delete(); db.session.commit(); session.pop('ultimo_lote_id', None)
+        flash('⏮️ Carga deshecha.', 'info')
     return redirect(url_for('main.inventario'))
