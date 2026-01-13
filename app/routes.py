@@ -387,7 +387,7 @@ def chatbot_responde():
     if not api_key: return jsonify({'respuesta': '⚠️ Error: Falta API Key de Google.'})
     
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-flash-latest')
     instruccion_sistema = f"Eres el asistente de 'Tecnicmaq'. HISTORIAL: {contexto_previo} USUARIO: '{mensaje_usuario}'. COMANDOS: COMANDO_ANALISIS|CLAVE, COMANDO_BUSCAR|termino, COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK. Responde natural si no hay comandos."
     try:
         response = model.generate_content(instruccion_sistema)
@@ -416,7 +416,10 @@ def chatbot_responde():
             else: respuesta_final = "⚠️ Error datos/duplicado."
         historial.append({"role": "Usuario", "text": mensaje_usuario}); historial.append({"role": "Bot", "text": respuesta_final})
         session['historial_chat'] = historial[-6:]; return jsonify({'respuesta': respuesta_final})
-    except: return jsonify({'respuesta': "😵 Error IA."})
+    except Exception as e:
+        # ESTO ES LO NUEVO: Imprimirá el error real en la consola de Render
+        print(f"🔥 ERROR GEMINI: {str(e)}") 
+        return jsonify({'respuesta': f"😵 Error interno: {str(e)}"})
 
 @main.route('/importar_excel', methods=['POST'])
 @login_required
