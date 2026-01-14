@@ -424,24 +424,76 @@ def chatbot_responde():
 @main.route('/importar_excel', methods=['POST'])
 @login_required
 def importar_excel():
-    if 'archivo_excel' not in request.files: return redirect(url_for('main.inventario'))
+    if 'archivo_excel' not in request.files:
+        return redirect(url_for('main.inventario'))
+    
     archivo = request.files['archivo_excel']
-    if archivo.filename == '': return redirect(url_for('main.inventario'))
+    if archivo.filename == '':
+        return redirect(url_for('main.inventario'))
+
     try:
+        # Leemos el Excel
         df = pd.read_excel(archivo, dtype={'Codigo': str})
-        df.columns = df.columns.str.strip()
-        contador, errores, lote_actual = 0, 0, str(uuid.uuid4())
-        for _, row in df.iterrows():
-            cod = str(row['Codigo']).strip()
-            if not cod or cod.lower() == 'nan' or Repuesto.query.filter_by(codigo=cod).first(): errores += 1; continue
+        df.columns = df.columns.str.strip() # Limpiamos espacios en nombres de columnas
+        
+        contador = 0
+        errores = 0
+        lote_actual = str(uuid.uuid4()) # ID para el botón deshacer
+
+        # --- OPTIMIZACIÓN DE MEMORIA ---
+        # Guardamos cada 50 productos para no llenar la RAM
+        BATCH_SIZE = 50 
+        
+        for index, row in df.iterrows():
+            raw_codigo = str(row['Codigo']).strip()
+            
+            # Validaciones básicas
+            if not raw_codigo or raw_codigo.lower() == 'nan':
+                errores += 1
+                continue
+            
+            # Verificar si ya existe (para no duplicar)
+            if Repuesto.query.filter_by(codigo=raw_codigo).first():
+                errores += 1
+                continue
+            
             try:
-                db.session.add(Repuesto(codigo=cod, nombre=row['Nombre'], marca=row['Marca'] if pd.notna(row['Marca']) else "Genérico", cantidad=int(float(row['Stock'] if pd.notna(row['Stock']) else 0)), costo=float(row['Costo_Compra'] if pd.notna(row['Costo_Compra']) else 0), precio=float(row['Precio_Venta'] if pd.notna(row['Precio_Venta']) else 0), lote_id=lote_actual))
+                # Crear el objeto
+                nuevo_repuesto = Repuesto(
+                    codigo=raw_codigo,
+                    nombre=row['Nombre'],
+                    marca=row['Marca'] if pd.notna(row['Marca']) else "Genérico",
+                    cantidad=int(float(row['Stock'] if pd.notna(row['Stock']) else 0)),
+                    costo=float(row['Costo_Compra'] if pd.notna(row['Costo_Compra']) else 0),
+                    precio=float(row['Precio_Venta'] if pd.notna(row['Precio_Venta']) else 0),
+                    lote_id=lote_actual
+                )
+                db.session.add(nuevo_repuesto)
                 contador += 1
-            except: errores += 1
+                
+                # --- LA MAGIA: GUARDAR PARCIALMENTE ---
+                # Cada 50 productos, guardamos y liberamos memoria
+                if contador % BATCH_SIZE == 0:
+                    db.session.commit()
+                    
+            except Exception as e:
+                errores += 1
+        
+        # Guardamos los últimos que hayan quedado pendientes
         db.session.commit()
-        if contador > 0: session['ultimo_lote_id'] = lote_actual; flash(f'Importados {contador}.', 'success')
-        if errores > 0: flash(f'{errores} fallaron.', 'warning')
-    except Exception as e: db.session.rollback(); flash(f'Error: {str(e)}', 'danger')
+
+        if contador > 0:
+            session['ultimo_lote_id'] = lote_actual
+            flash(f'¡Éxito! Importados {contador} productos. (Errores/Duplicados: {errores})', 'success')
+        elif errores > 0:
+            flash(f'No se importó nada. {errores} filas fallaron (códigos vacíos o duplicados).', 'warning')
+            
+    except Exception as e:
+        db.session.rollback()
+        # Imprimimos el error en los logs para verlo si falla
+        print(f"🔥 ERROR EXCEL: {str(e)}")
+        flash(f'Error crítico al procesar: {str(e)}', 'danger')
+
     return redirect(url_for('main.inventario'))
 
 @main.route('/deshacer_carga')
