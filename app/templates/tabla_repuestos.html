@@ -1,0 +1,27 @@
+{% for r in repuestos %}
+<tr class="fila-producto">
+    <td class="text-center"><img src="{{ url_for('static', filename='uploads/' + r.imagen_filename) }}" class="img-zoom"></td>
+    <td class="fw-bold text-primary">{{ r.codigo }}</td>
+    <td><div class="fw-bold">{{ r.nombre }}</div><small class="text-muted">{{ r.marca }}</small></td>
+    <td class="text-center"><span class="badge {{ 'bg-danger' if r.cantidad <= 2 else 'bg-warning text-dark' if r.cantidad < 5 else 'bg-success' }} rounded-pill">{{ r.cantidad }}</span></td>
+    <td class="text-muted small">S/{{ r.costo }}</td>
+    <td class="fw-bold text-success">S/{{ r.precio }}</td>
+    <td><span class="badge bg-light text-dark border">+ S/{{ "%.2f"|format(r.precio - r.costo) }}</span></td>
+    <td class="text-end">
+        <div class="btn-group shadow-sm">
+            {% if r.cantidad > 0 %}
+                <a href="{{ url_for('main.vender_producto', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-success fw-bold">Vender</a>
+                <a href="{{ url_for('main.crear_reserva', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-warning">Reservar</a>
+            {% else %}
+                <button class="btn btn-sm btn-secondary" disabled>Agotado</button>
+            {% endif %}
+            
+            <a href="{{ url_for('main.editar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+            
+            <a href="{{ url_for('main.eliminar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar definitivamente?');">X</a>
+        </div>
+    </td>
+</tr>
+{% else %}
+<tr><td colspan="8" class="text-center py-5">No se encontraron repuestos.</td></tr>
+{% endfor %}

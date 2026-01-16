@@ -10,45 +10,33 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold text-dark">Inventario</h2>
     <div class="d-flex gap-2 align-items-center">
-        <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-primary btn-sm shadow-sm">
-            <i class="bi bi-download"></i> Descargar Excel
-        </a>
-
+        <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-primary btn-sm shadow-sm"><i class="bi bi-download"></i> Excel</a>
         <form action="{{ url_for('main.importar_excel') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
             <input type="file" name="archivo_excel" class="form-control form-control-sm" accept=".xlsx, .xls" required style="width: 200px;">
             <button type="submit" class="btn btn-warning btn-sm text-dark shadow-sm"><i class="bi bi-file-earmark-spreadsheet"></i> Subir</button>
         </form>
-
         {% if session.get('ultimo_lote_id') %}
             <a href="{{ url_for('main.deshacer_carga') }}" class="btn btn-outline-danger btn-sm shadow-sm animate-pulse"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</a>
         {% endif %}
-        
         <a href="/agregar" class="btn btn-success shadow-sm"><i class="bi bi-plus-circle"></i> + Nuevo</a>
     </div>
 </div>
 
 <div class="card shadow-sm mb-4 border-0 bg-light">
     <div class="card-body py-3">
-        <form action="{{ url_for('main.inventario') }}" method="GET" class="row g-2 align-items-center">
+        <form action="{{ url_for('main.inventario') }}" method="GET" class="row g-2 align-items-center" id="formFiltros">
             <div class="col-md-8">
                 <div class="input-group">
                     <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                    <input type="text" name="q" value="{{ busqueda }}" class="form-control form-control-lg border-start-0" placeholder="Buscar...">
-                    <button type="submit" class="btn btn-outline-secondary">Buscar</button>
-                    {% if busqueda or orden_actual != 'defecto' %}
-                        <a href="{{ url_for('main.inventario') }}" class="btn btn-outline-danger">Limpiar</a>
-                    {% endif %}
+                    <input type="text" id="inputBusqueda" name="q" value="{{ busqueda }}" class="form-control form-control-lg border-start-0" placeholder="Escribe para buscar (Ej: foco led)..." autocomplete="off">
                 </div>
             </div>
             <div class="col-md-4">
                 <select name="orden" class="form-select form-select-lg" onchange="this.form.submit()">
                     <option value="defecto" {% if orden_actual == 'defecto' %}selected{% endif %}>📅 Recientes</option>
                     <option value="nombre_asc" {% if orden_actual == 'nombre_asc' %}selected{% endif %}>🔤 Nombre (A-Z)</option>
-                    <option value="nombre_desc" {% if orden_actual == 'nombre_desc' %}selected{% endif %}>🔤 Nombre (Z-A)</option>
                     <option value="precio_alto" {% if orden_actual == 'precio_alto' %}selected{% endif %}>💲 Precio (Alto-Bajo)</option>
-                    <option value="precio_bajo" {% if orden_actual == 'precio_bajo' %}selected{% endif %}>💲 Precio (Bajo-Alto)</option>
                     <option value="stock_bajo" {% if orden_actual == 'stock_bajo' %}selected{% endif %}>⚠️ Stock (Bajo-Alto)</option>
-                    <option value="stock_alto" {% if orden_actual == 'stock_alto' %}selected{% endif %}>📦 Stock (Alto-Bajo)</option>
                 </select>
             </div>
         </form>
@@ -62,32 +50,8 @@
                 <thead class="table-dark small text-uppercase">
                     <tr><th>Foto</th><th>Código</th><th>Nombre / Marca</th><th class="text-center">Stock</th><th>Costo</th><th>P. Venta</th><th>Margen</th><th class="text-end">Acciones</th></tr>
                 </thead>
-                <tbody>
-                    {% for r in repuestos %}
-                    <tr>
-                        <td class="text-center"><img src="{{ url_for('static', filename='uploads/' + r.imagen_filename) }}" class="img-zoom"></td>
-                        <td class="fw-bold text-primary">{{ r.codigo }}</td>
-                        <td><div class="fw-bold">{{ r.nombre }}</div><small class="text-muted">{{ r.marca }}</small></td>
-                        <td class="text-center"><span class="badge {{ 'bg-danger' if r.cantidad <= 2 else 'bg-warning text-dark' if r.cantidad < 5 else 'bg-success' }} rounded-pill">{{ r.cantidad }}</span></td>
-                        <td class="text-muted small">S/{{ r.costo }}</td>
-                        <td class="fw-bold text-success">S/{{ r.precio }}</td>
-                        <td><span class="badge bg-light text-dark border">+ S/{{ "%.2f"|format(r.precio - r.costo) }}</span></td>
-                        <td class="text-end">
-                            <div class="btn-group shadow-sm">
-                                {% if r.cantidad > 0 %}
-                                    <a href="/vender/{{ r.id }}" class="btn btn-sm btn-success fw-bold">Vender</a>
-                                    <a href="/reservar/{{ r.id }}" class="btn btn-sm btn-warning">Reservar</a>
-                                {% else %}
-                                    <button class="btn btn-sm btn-secondary" disabled>Agotado</button>
-                                {% endif %}
-                                <a href="/editar/{{ r.id }}" class="btn btn-sm btn-outline-primary">Editar</a>
-                                <a href="/eliminar/{{ r.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar?');">X</a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="8" class="text-center py-5">No hay repuestos que coincidan.</td></tr>
-                    {% endfor %}
+                <tbody id="tablaCuerpo">
+                    {% include 'tabla_repuestos.html' %}
                 </tbody>
             </table>
         </div>
@@ -99,9 +63,7 @@
                 <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
                     <a class="page-link" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
                 </li>
-                
                 <li class="page-item disabled"><span class="page-link">Página {{ pagination.page }} de {{ pagination.pages }}</span></li>
-                
                 <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
                     <a class="page-link" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>
                 </li>
@@ -109,4 +71,32 @@
         </nav>
     </div>
 </div>
+
+<script>
+    let timeout = null;
+    const input = document.getElementById('inputBusqueda');
+    const tabla = document.getElementById('tablaCuerpo');
+
+    input.addEventListener('input', function() {
+        // Limpiamos el reloj anterior para no buscar por cada letra, sino cuando dejes de escribir un poquito
+        clearTimeout(timeout);
+
+        // Esperamos 300ms después de que dejes de escribir
+        timeout = setTimeout(() => {
+            const texto = input.value;
+            
+            // Hacemos la petición al servidor sin recargar la página
+            fetch(`/inventario?q=${encodeURIComponent(texto)}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(response => response.text())
+            .then(html => {
+                // Reemplazamos el cuerpo de la tabla con el nuevo HTML
+                tabla.innerHTML = html;
+            })
+            .catch(error => console.error('Error:', error));
+            
+        }, 300);
+    });
+</script>
 {% endblock %}
