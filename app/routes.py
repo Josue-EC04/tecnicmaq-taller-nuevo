@@ -9,6 +9,7 @@ import google.generativeai as genai
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import func
+import difflib
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, make_response, jsonify, session
 from werkzeug.utils import secure_filename
@@ -56,15 +57,15 @@ def dashboard():
 @main.route('/inventario')
 @login_required
 def inventario():
-    # Parámetros de la URL
     page = request.args.get('page', 1, type=int)
     per_page = 20
     busqueda = request.args.get('q', '').strip()
     orden = request.args.get('orden', 'defecto')
     
     query = Repuesto.query
+    mensaje_sugerencia = None 
 
-    # --- BÚSQUEDA INTELIGENTE ---
+    # 1. BÚSQUEDA EXACTA
     if busqueda:
         terminos = busqueda.split()
         for termino in terminos:
@@ -74,35 +75,48 @@ def inventario():
                 (Repuesto.marca.ilike(f'%{termino}%'))
             )
     
-    # ORDENAMIENTO
-    if orden == 'nombre_asc':
-        query = query.order_by(Repuesto.nombre.asc())
-    elif orden == 'nombre_desc':
-        query = query.order_by(Repuesto.nombre.desc())
-    elif orden == 'precio_alto':
-        query = query.order_by(Repuesto.precio.desc())
-    elif orden == 'precio_bajo':
-        query = query.order_by(Repuesto.precio.asc())
-    elif orden == 'stock_bajo':
-        query = query.order_by(Repuesto.cantidad.asc())
-    elif orden == 'stock_alto':
-        query = query.order_by(Repuesto.cantidad.desc())
-    else:
-        query = query.order_by(Repuesto.id.desc())
+    # Aplicar orden (Igual que antes)
+    if orden == 'nombre_asc': query = query.order_by(Repuesto.nombre.asc())
+    elif orden == 'nombre_desc': query = query.order_by(Repuesto.nombre.desc())
+    elif orden == 'precio_alto': query = query.order_by(Repuesto.precio.desc())
+    elif orden == 'precio_bajo': query = query.order_by(Repuesto.precio.asc())
+    elif orden == 'stock_bajo': query = query.order_by(Repuesto.cantidad.asc())
+    elif orden == 'stock_alto': query = query.order_by(Repuesto.cantidad.desc())
+    else: query = query.order_by(Repuesto.id.desc())
 
-    # PAGINACIÓN
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     repuestos = pagination.items
 
-    # Respuesta AJAX para búsqueda en vivo
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('tabla_repuestos.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden)
+    # 2. BÚSQUEDA INTELIGENTE (Si no hubo resultados exactos)
+    if not repuestos and busqueda and page == 1:
+        # Traemos todos los nombres para analizar palabras
+        todos = db.session.query(Repuesto.nombre).all()
+        
+        # Creamos un conjunto de PALABRAS ÚNICAS (rompemos las frases)
+        palabras_db = set()
+        for prod in todos:
+            # "TAPA RADIADOR" -> agrega "TAPA" y "RADIADOR"
+            for palabra in prod.nombre.split():
+                if len(palabra) > 3: # Ignoramos palabras muy cortas
+                    palabras_db.add(palabra.upper())
+        
+        # Buscamos si "tapp" se parece a alguna palabra de la base de datos
+        # cutoff=0.6 significa 60% de parecido
+        posibles_palabras = difflib.get_close_matches(busqueda.upper(), list(palabras_db), n=1, cutoff=0.6)
+        
+        if posibles_palabras:
+            palabra_corregida = posibles_palabras[0] # Ej: encontró "TAPA"
+            
+            # Hacemos la búsqueda de nuevo pero con la palabra corregida
+            repuestos = Repuesto.query.filter(Repuesto.nombre.ilike(f'%{palabra_corregida}%')).all()
+            
+            if repuestos:
+                mensaje_sugerencia = f"No encontramos '{busqueda}', pero quizás buscabas '{palabra_corregida}':"
 
-    return render_template('inventario.html', 
-                           repuestos=repuestos, 
-                           pagination=pagination,
-                           busqueda=busqueda,
-                           orden_actual=orden)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render_template('tabla_repuestos.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia)
+
+    return render_template('inventario.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia)
 
 @main.route('/exportar_excel')
 @login_required
