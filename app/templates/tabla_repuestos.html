@@ -1,27 +1,88 @@
-{% for r in repuestos %}
-<tr class="fila-producto">
-    <td class="text-center"><img src="{{ url_for('static', filename='uploads/' + r.imagen_filename) }}" class="img-zoom"></td>
-    <td class="fw-bold text-primary">{{ r.codigo }}</td>
-    <td><div class="fw-bold">{{ r.nombre }}</div><small class="text-muted">{{ r.marca }}</small></td>
-    <td class="text-center"><span class="badge {{ 'bg-danger' if r.cantidad <= 2 else 'bg-warning text-dark' if r.cantidad < 5 else 'bg-success' }} rounded-pill">{{ r.cantidad }}</span></td>
-    <td class="text-muted small">S/{{ r.costo }}</td>
-    <td class="fw-bold text-success">S/{{ r.precio }}</td>
-    <td><span class="badge bg-light text-dark border">+ S/{{ "%.2f"|format(r.precio - r.costo) }}</span></td>
-    <td class="text-end">
-        <div class="btn-group shadow-sm">
-            {% if r.cantidad > 0 %}
-                <a href="{{ url_for('main.vender_producto', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-success fw-bold">Vender</a>
-                <a href="{{ url_for('main.crear_reserva', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-warning">Reservar</a>
-            {% else %}
-                <button class="btn btn-sm btn-secondary" disabled>Agotado</button>
-            {% endif %}
-            
-            <a href="{{ url_for('main.editar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-outline-primary">Editar</a>
-            
-            <a href="{{ url_for('main.eliminar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar definitivamente?');">X</a>
-        </div>
-    </td>
-</tr>
-{% else %}
-<tr><td colspan="8" class="text-center py-5">No se encontraron repuestos.</td></tr>
-{% endfor %}
+<div class="card-body p-0">
+    <div class="table-responsive">
+        <table class="table table-modern mb-0 w-100">
+            <thead>
+                <tr>
+                    <th class="ps-4">Producto</th>
+                    <th class="text-center">Stock</th>
+                    <th>Costo</th>
+                    <th>P. Venta</th>
+                    <th>Margen</th>
+                    <th class="text-end pe-4">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in repuestos %}
+                <tr>
+                    <td class="ps-4">
+                        <div class="d-flex align-items-center">
+                            <img src="{{ url_for('static', filename='uploads/' + (r.imagen_filename if r.imagen_filename else 'default.jpg')) }}" class="img-zoom flex-shrink-0 me-3">
+                            <div>
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-2 px-2 mb-1" style="font-family: monospace; font-size: 0.75rem;">{{ r.codigo }}</span>
+                                <div class="fw-bold text-dark" style="font-size: 0.95rem;">{{ r.nombre }}</div>
+                                <small class="text-muted text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">{{ r.marca }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-center align-middle">
+                        {% if r.cantidad <= 2 %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-2 border border-danger border-opacity-25">Crítico: {{ r.cantidad }}</span>
+                        {% elif r.cantidad < 5 %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning-emphasis rounded-pill px-3 py-2 border border-warning border-opacity-25">Bajo: {{ r.cantidad }}</span>
+                        {% else %}
+                            <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 border border-success border-opacity-25">{{ r.cantidad }} uds.</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted align-middle" style="font-family: monospace;">S/{{ "%.2f"|format(r.costo or 0) }}</td>
+                    <td class="fw-bold text-success fs-6 align-middle" style="font-family: monospace;">S/{{ "%.2f"|format(r.precio or 0) }}</td>
+                    <td class="align-middle">
+                        <span class="badge bg-light text-dark border fw-normal text-muted">+ S/{{ "%.2f"|format((r.precio or 0) - (r.costo or 0)) }}</span>
+                    </td>
+                    <td class="text-end pe-4 align-middle">
+                        <div class="btn-group">
+                            {% if r.cantidad > 0 %}
+                                <button type="button" class="btn btn-sm btn-success fw-bold px-3 d-flex align-items-center gap-1 shadow-sm" 
+                                        data-bs-toggle="modal" data-bs-target="#modalVenta"
+                                        data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-precio="{{ r.precio or 0 }}" data-stock="{{ r.cantidad or 0 }}">
+                                    <i class="bi bi-cash"></i> Vender
+                                </button>
+                                <a href="{{ url_for('main.crear_reserva', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-warning shadow-sm" title="Reservar"><i class="bi bi-clock-history"></i></a>
+                            {% else %}
+                                <button class="btn btn-sm btn-light text-muted border" disabled>Agotado</button>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-white border text-primary ms-1"
+                                    data-bs-toggle="modal" data-bs-target="#modalEditar"
+                                    data-id="{{ r.id }}" data-codigo="{{ r.codigo or '' }}" data-nombre="{{ r.nombre or '' }}"
+                                    data-marca="{{ r.marca or '' }}" data-cantidad="{{ r.cantidad or 0 }}"
+                                    data-costo="{{ r.costo or 0 }}" data-precio="{{ r.precio or 0 }}" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <a href="{{ url_for('main.eliminar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-white border text-danger" onclick="return confirm('¿Eliminar definitivamente?');" title="Eliminar"><i class="bi bi-trash"></i></a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center py-5 text-muted">No se encontraron repuestos con esos términos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card-footer bg-white border-top-0 py-4">
+    <nav>
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link border-0 fw-bold bg-transparent text-muted">
+                    Pág {{ pagination.page }} de {{ pagination.pages }} 
+                </span>
+            </li>
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>
+            </li>
+        </ul>
+    </nav>
+</div>

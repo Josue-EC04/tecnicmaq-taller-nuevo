@@ -1,62 +1,77 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2 class="mb-4">Reservas Activas (Pendientes de Retiro)</h2>
+<div class="bg-white p-4 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center shadow-sm p-3" style="width: 60px; height: 60px;">
+            <i class="bi bi-calendar-check fs-2"></i>
+        </div>
+        <div>
+            <h3 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                Reservas Activas
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" height="35" class="d-none d-md-inline ms-2">
+            </h3>
+            <p class="text-muted mb-0">Gestiona los apartados y pedidos pendientes.</p>
+        </div>
+    </div>
+    <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill shadow-sm">
+        <i class="bi bi-hourglass-split"></i> {{ reservas|length }} Pendientes
+    </span>
+</div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }}">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
+<div class="row g-3">
+    {% for reserva in reservas %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden hover-shadow transition-all">
+            <div class="card-body p-0">
+                <div class="d-flex align-items-center p-3 bg-light border-bottom gap-3">
+                    {% if reserva.repuesto %}
+                        <img src="{{ url_for('static', filename='uploads/' + reserva.repuesto.imagen_filename) }}" class="rounded-3 border shadow-sm" width="70" height="70" style="object-fit: cover;">
+                        <div>
+                            <h6 class="fw-bold mb-1 text-truncate" style="max-width: 200px;">{{ reserva.repuesto.nombre }}</h6>
+                            <small class="text-muted d-block">{{ reserva.repuesto.codigo }}</small>
+                            <span class="badge bg-primary rounded-pill mt-1">Cant: {{ reserva.cantidad }}</span>
+                        </div>
+                    {% else %}
+                        <div class="bg-secondary bg-opacity-10 rounded-3 d-flex align-items-center justify-content-center text-muted" style="width: 70px; height: 70px;">
+                            <i class="bi bi-box-seam-fill fs-4"></i>
+                        </div>
+                        <div class="text-muted fst-italic">Producto eliminado</div>
+                    {% endif %}
+                </div>
 
-<div class="card shadow border-0">
-    <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-            <tr>
-                <th>Cliente</th>
-                <th>Contacto</th>
-                <th>Repuesto</th>
-                <th>Cant.</th>
-                <th>Fecha</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for reserva in reservas %}
-            <tr>
-                <td class="fw-bold">{{ reserva.cliente }}</td>
-                <td>{{ reserva.telefono }}</td>
-                <td>
-                    {{ reserva.repuesto.nombre }} <br>
-                    <small class="text-muted">{{ reserva.repuesto.codigo }}</small>
-                </td>
-                <td><span class="badge bg-warning text-dark fs-6">{{ reserva.cantidad }}</span></td>
-                <td>{{ reserva.fecha.strftime('%Y-%m-%d') }}</td>
-                <td>
-                    <div class="btn-group">
-                        <a href="/gestion_reserva/{{ reserva.id }}/confirmar" 
-                           class="btn btn-sm btn-success"
-                           onclick="return confirm('¿El cliente ya pagó/retiró el producto?');">
-                           ✅ Concretar Venta
+                <div class="p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle p-1"><i class="bi bi-person-fill"></i></div>
+                        <h6 class="fw-bold mb-0">{{ reserva.cliente }}</h6>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 text-muted small mb-3 ms-1">
+                        <i class="bi bi-telephone-fill"></i> {{ reserva.telefono }}
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex mt-3">
+                        <a href="{{ url_for('main.gestion_reserva', id=reserva.id, accion='confirmar') }}" class="btn btn-success btn-sm fw-bold flex-fill shadow-sm" onclick="return confirm('¿Confirmar que se pagó y entregó?');">
+                            <i class="bi bi-check-lg"></i> Completar Venta
                         </a>
-                        <a href="/gestion_reserva/{{ reserva.id }}/cancelar" 
-                           class="btn btn-sm btn-outline-danger"
-                           onclick="return confirm('¿Liberar stock y devolver al inventario?');">
-                           ❌ Cancelar
+                        <a href="{{ url_for('main.gestion_reserva', id=reserva.id, accion='cancelar') }}" class="btn btn-outline-danger btn-sm flex-fill" onclick="return confirm('¿Cancelar reserva y devolver stock?');">
+                            <i class="bi bi-x-lg"></i> Cancelar
                         </a>
                     </div>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="6" class="text-center py-5 text-muted">
-                    No hay reservas pendientes.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5 text-muted">
+        <i class="bi bi-calendar-x display-1 opacity-25 mb-3"></i>
+        <h4>No hay reservas pendientes</h4>
+        <p>Los productos apartados aparecerán aquí.</p>
+    </div>
+    {% endfor %}
 </div>
+
+<style>
+    .hover-shadow:hover { box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; transform: translateY(-3px); }
+    .transition-all { transition: all 0.3s ease; }
+</style>
 {% endblock %}

@@ -1,96 +1,82 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="fw-bold">📊 Reporte Mensual de Ventas</h2>
-        <p class="text-muted">Despliega cada mes para ver el detalle.</p>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="bg-white p-4 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center shadow-sm p-3" style="width: 60px; height: 60px;">
+            <i class="bi bi-graph-up-arrow fs-2"></i>
+        </div>
+        <div>
+            <h3 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                Reporte de Ventas
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" height="35" class="d-none d-md-inline ms-2">
+            </h3>
+            <p class="text-muted mb-0">Análisis financiero y rendimiento.</p>
+        </div>
     </div>
-    
-    <div class="card bg-success text-white shadow-sm">
-        <div class="card-body py-2 px-4 text-center">
-            <span class="small text-uppercase fw-bold opacity-75">Ganancia Histórica</span>
-            <div class="h3 fw-bold mb-0">S/{{ "%.2f"|format(total_ganancia_global) }}</div>
+    <div class="d-flex gap-3">
+        <div class="bg-success text-white p-3 rounded-3 shadow text-center" style="min-width: 180px; background: linear-gradient(135deg, #198754, #20c997);">
+            <small class="opacity-75 text-uppercase fw-bold ls-1">Ganancia Total</small>
+            <h2 class="fw-bold mb-0">S/{{ "%.2f"|format(total_ganancia_global) }}</h2>
+        </div>
+        <div class="bg-primary text-white p-3 rounded-3 shadow text-center d-none d-md-block" style="min-width: 150px; background: linear-gradient(135deg, #0d6efd, #0dcaf0);">
+             <small class="opacity-75 text-uppercase fw-bold ls-1">Ventas Realizadas</small>
+            <h2 class="fw-bold mb-0">{{ total_ventas_count }}</h2>
         </div>
     </div>
 </div>
 
-<div class="accordion shadow-sm" id="accordionVentas">
-    
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-header bg-white border-0 pt-4 ps-4">
+        <h5 class="fw-bold mb-0"><i class="bi bi-bar-chart-line-fill text-primary me-2"></i>Evolución de Ganancias Mensuales</h5>
+    </div>
+    <div class="card-body p-4">
+        <canvas id="ventasChart" style="max-height: 350px;"></canvas>
+    </div>
+</div>
+
+<h5 class="fw-bold mb-3 text-muted px-2">Detalle Histórico</h5>
+<div class="accordion shadow-sm rounded-4 overflow-hidden" id="accordionVentas">
     {% for periodo, datos in historial_agrupado.items() %}
-    <div class="accordion-item border-0 mb-3 shadow-sm rounded overflow-hidden">
-        
-        <h2 class="accordion-header" id="heading{{ loop.index }}">
-            <button class="accordion-button {% if not loop.first %}collapsed{% endif %} bg-light" 
-                    type="button" 
-                    data-bs-toggle="collapse" 
-                    data-bs-target="#collapse{{ loop.index }}" 
-                    aria-expanded="{{ 'true' if loop.first else 'false' }}">
-                
-                <div class="d-flex w-100 justify-content-between align-items-center me-3">
-                    <div class="fw-bold fs-5 text-dark">
-                        📅 {{ periodo }}
-                    </div>
-                    
-                    <div class="d-flex gap-3 text-end">
-                        <div class="d-none d-md-block">
-                            <small class="text-muted d-block">Ingresos</small>
-                            <span class="fw-bold text-dark">S/{{ "%.2f"|format(datos.suma_ingresos) }}</span>
-                        </div>
-                        <div>
-                            <small class="text-success d-block fw-bold">Ganancia Neta</small>
-                            <span class="badge bg-success fs-6">+ S/{{ "%.2f"|format(datos.suma_ganancia) }}</span>
-                        </div>
+    <div class="accordion-item border-0 border-bottom">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed bg-white py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}">
+                <div class="d-flex justify-content-between w-100 me-3 align-items-center">
+                    <span class="fw-bold fs-5 text-dark"><i class="bi bi-calendar-month text-primary me-2"></i>{{ periodo }}</span>
+                    <div class="text-end d-none d-sm-block">
+                        <span class="badge bg-light text-dark border me-2">{{ datos['ventas']|length }} Ventas</span>
+                        <span class="badge bg-success text-white shadow-sm p-2">Ganancia: S/{{ "%.2f"|format(datos['suma_ganancia']) }}</span>
                     </div>
                 </div>
-
             </button>
         </h2>
-
-        <div id="collapse{{ loop.index }}" 
-             class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
-             data-bs-parent="#accordionVentas">
-            
+        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#accordionVentas">
             <div class="accordion-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped mb-0 align-middle">
-                        <thead class="table-dark small">
-                            <tr>
-                                <th>Fecha Hora</th>
-                                <th>Producto</th>
-                                <th class="text-center">Cant.</th>
-                                <th>Precio Unit.</th>
-                                <th>Total Venta</th>
-                                <th class="text-success text-end">Ganancia</th>
-                                <th>Acciones</th>
-                            </tr>
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light small text-muted">
+                            <tr><th>Fecha</th><th>Producto</th><th class="text-center">Cant.</th><th>Venta Total</th><th class="text-success">Ganancia</th><th class="text-end">Acción</th></tr>
                         </thead>
                         <tbody>
-                            {% for venta in datos.ventas %}
+                        {% for venta in datos['ventas'] %}
                             <tr>
-                                <td class="small">{{ venta.fecha.strftime('%d/%m %H:%M') }}</td>
+                                <td class="small text-muted">{{ venta.fecha.strftime('%d/%m %H:%M') }}</td>
                                 <td>
-                                    <div class="fw-bold">{{ venta.repuesto_nombre }}</div>
+                                    <div class="fw-bold text-truncate" style="max-width: 180px;">{{ venta.repuesto_nombre }}</div>
                                     <small class="text-muted">{{ venta.repuesto_codigo }}</small>
                                 </td>
-                                <td class="text-center">
-                                    <span class="badge bg-light text-dark border">{{ venta.cantidad }}</span>
-                                </td>
-                                <td>S/{{ venta.precio_unitario }}</td>
-                                <td class="fw-bold">S/{{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</td>
-                                <td class="text-success fw-bold text-end">
-                                    + S/{{ "%.2f"|format(venta.ganancia_total) }}
-                                </td>
-                                <td>
-                                    <form action="{{ url_for('main.eliminar_venta', id=venta.id) }}" method="POST" style="display:inline;">
-                                        <button type="submit" class="btn btn-danger btn-sm" 
-                                                onclick="return confirm('¿Seguro que quieres eliminar esta venta? Esto no devuelve el stock al inventario automáticamente.');">
-                                            🗑 Borrar
-                                        </button>
+                                <td class="text-center fw-bold">{{ venta.cantidad }}</td>
+                                <td>S/{{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</td>
+                                <td class="text-success fw-bold">+S/{{ "%.2f"|format(venta.ganancia_total) }}</td>
+                                <td class="text-end">
+                                    <form action="{{ url_for('main.eliminar_venta', id=venta.id) }}" method="POST" onsubmit="return confirm('¿Borrar este registro de venta? (No devuelve stock)');">
+                                        <button class="btn btn-sm btn-outline-danger border-0" title="Eliminar registro"><i class="bi bi-trash-fill"></i></button>
                                     </form>
                                 </td>
                             </tr>
-                            {% endfor %}
+                        {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -98,10 +84,57 @@
         </div>
     </div>
     {% else %}
-        <div class="alert alert-info text-center">
-            📭 Aún no hay ventas registradas en el sistema.
-        </div>
+    <div class="text-center py-5 text-muted">No hay historial de ventas registrado.</div>
     {% endfor %}
-
 </div>
+
+<script>
+    // Recibimos los datos crudos desde Python
+    const labels = JSON.parse('{{ chart_labels | safe }}');
+    const dataGains = JSON.parse('{{ chart_data | safe }}');
+
+    const ctx = document.getElementById('ventasChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar', // Tipo de gráfico: Barras
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Ganancia Neta (S/)',
+                data: dataGains,
+                backgroundColor: 'rgba(25, 135, 84, 0.7)', // Color verde transparente
+                borderColor: '#198754',
+                borderWidth: 2,
+                borderRadius: 8, // Barras redondeadas
+                hoverBackgroundColor: '#198754'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }, // Ocultar leyenda simple
+                tooltip: {
+                    backgroundColor: '#212529',
+                    titleFont: { size: 14 },
+                    bodyFont: { size: 16, weight: 'bold' },
+                    callbacks: {
+                        label: function(context) {
+                            return ' Ganancia: S/' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    ticks: {
+                        callback: function(value) { return 'S/' + value; }
+                    }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+</script>
 {% endblock %}

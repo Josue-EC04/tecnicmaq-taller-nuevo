@@ -6,9 +6,9 @@ import pandas as pd
 import io 
 import gc  # IMPORTANTE: Para limpiar memoria RAM en Render
 import google.generativeai as genai
-from datetime import datetime
+from datetime import datetime, date
 from collections import defaultdict
-from sqlalchemy import func
+from sqlalchemy import func, desc
 import difflib
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, make_response, jsonify, session
@@ -42,18 +42,39 @@ def dashboard():
     if not current_user.is_authenticated:
         return redirect(url_for('main.login'))
     
+    # Métricas existentes
     total_tipos = Repuesto.query.count()
     alertas_stock = Repuesto.query.filter(Repuesto.cantidad < 5).count()
     total_reservas = Reserva.query.count()
-    total_valor = db.session.query(func.sum(Repuesto.costo * Repuesto.cantidad)).scalar()
-    valor_inventario = total_valor if total_valor else 0
+    
+    # Calcular valor del inventario (Costo * Cantidad)
+    total_valor = db.session.query(func.sum(Repuesto.costo * Repuesto.cantidad)).scalar() or 0
+
+    # --- NUEVAS MÉTRICAS PARA REEMPLAZAR "PRÓXIMAMENTE" ---
+
+    # 1. Ingresos de HOY
+    hoy = date.today()
+    # Sumamos (precio * cantidad) solo de las ventas con fecha de hoy
+    ingreso_hoy_total = db.session.query(func.sum(Venta.precio_unitario * Venta.cantidad)).filter(func.date(Venta.fecha) == hoy).scalar() or 0
+    ventas_hoy_count = Venta.query.filter(func.date(Venta.fecha) == hoy).count()
+
+    # 2. Top 3 Productos Más Vendidos (Histórico)
+    # Agrupamos por nombre, sumamos cantidad vendida, ordenamos descendente y tomamos los 3 primeros
+    top_ventas = db.session.query(
+        Venta.repuesto_nombre,
+        func.sum(Venta.cantidad).label('total_vendido')
+    ).group_by(Venta.repuesto_nombre).order_by(desc('total_vendido')).limit(3).all()
 
     return render_template('dashboard.html', 
                            total_tipos=total_tipos,
                            alertas_stock=alertas_stock,
                            total_reservas=total_reservas,
-                           valor_inventario=valor_inventario)
-
+                           valor_inventario=total_valor,
+                           # Pasamos las nuevas variables a la plantilla
+                           ingreso_hoy_total=ingreso_hoy_total,
+                           ventas_hoy_count=ventas_hoy_count,
+                           top_ventas=top_ventas,
+                           datetime=datetime)
 @main.route('/inventario')
 @login_required
 def inventario():
@@ -168,7 +189,7 @@ def login():
         else:
             flash('Usuario o contraseña incorrectos.', 'danger')
             
-    return render_template('login.html')
+    return render_template('login.html', datetime=datetime)
 
 @main.route('/logout')
 @login_required
@@ -212,37 +233,33 @@ def agregar():
 
     return render_template('agregar.html')
 
-@main.route('/editar/<int:id>', methods=['GET', 'POST'])
+@main.route('/editar/<int:id>', methods=['POST']) # Solo POST para el modal
 @login_required
 def editar(id):
     repuesto = Repuesto.query.get_or_404(id)
-    # MEMORIA DE NAVEGACIÓN
     q = request.args.get('q', '')
     orden = request.args.get('orden', 'defecto')
     page = request.args.get('page', 1, type=int)
     
-    if request.method == 'POST':
-        repuesto.codigo = request.form.get('codigo')
-        repuesto.nombre = request.form.get('nombre')
-        repuesto.marca = request.form.get('marca')
-        try:
-            repuesto.cantidad = int(request.form.get('cantidad') or 0)
-            repuesto.costo = float(request.form.get('costo') or 0)
-            repuesto.precio = float(request.form.get('precio') or 0)
-        except ValueError:
-            flash('Error numérico.', 'danger')
-            return redirect(url_for('main.editar', id=id, q=q, orden=orden, page=page))
-
-        imagen = request.files.get('imagen')
-        if imagen and imagen.filename != '':
-            filename = guardar_imagen(imagen)
-            if filename: repuesto.imagen_filename = filename
-            
-        db.session.commit()
-        flash('Repuesto actualizado.', 'success')
+    repuesto.codigo = request.form.get('codigo')
+    repuesto.nombre = request.form.get('nombre')
+    repuesto.marca = request.form.get('marca')
+    try:
+        repuesto.cantidad = int(request.form.get('cantidad') or 0)
+        repuesto.costo = float(request.form.get('costo') or 0)
+        repuesto.precio = float(request.form.get('precio') or 0)
+    except ValueError:
+        flash('Error numérico.', 'danger')
         return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
+
+    imagen = request.files.get('imagen')
+    if imagen and imagen.filename != '':
+        filename = guardar_imagen(imagen)
+        if filename: repuesto.imagen_filename = filename
         
-    return render_template('editar.html', repuesto=repuesto, q=q, orden=orden, page=page)
+    db.session.commit()
+    flash('Repuesto actualizado.', 'success')
+    return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
 
 @main.route('/eliminar/<int:id>')
 @login_required
@@ -257,37 +274,46 @@ def eliminar(id):
     flash('Repuesto eliminado.', 'warning')
     return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
 
-@main.route('/vender/<int:id>', methods=['GET', 'POST'])
+@main.route('/vender/<int:id>', methods=['POST']) # OJO: Ahora solo aceptamos POST porque el formulario está en el modal
 @login_required
 def vender_producto(id):
     repuesto = Repuesto.query.get_or_404(id)
+    # Capturar memoria
     q = request.args.get('q', '')
     orden = request.args.get('orden', 'defecto')
     page = request.args.get('page', 1, type=int)
     
-    if request.method == 'POST':
-        try:
-            cantidad = int(request.form.get('cantidad') or 0)
-        except ValueError:
-            flash('Cantidad inválida.', 'danger')
-            return redirect(url_for('main.vender_producto', id=id, q=q, orden=orden, page=page))
-        
-        if cantidad > repuesto.cantidad:
-            flash('Error: Stock insuficiente.', 'danger')
-            return redirect(url_for('main.vender_producto', id=id, q=q, orden=orden, page=page))
-            
-        total_pagar = repuesto.precio * cantidad
-        ganancia = (repuesto.precio - repuesto.costo) * cantidad
-        repuesto.cantidad -= cantidad
-        
-        nueva_venta = Venta(cantidad=cantidad, precio_unitario=repuesto.precio, costo_unitario=repuesto.costo, ganancia_total=ganancia, repuesto_nombre=repuesto.nombre, repuesto_codigo=repuesto.codigo)
-        db.session.add(nueva_venta)
-        db.session.commit()
-        
-        flash(f'¡Venta registrada! Ingreso: S/{total_pagar:.2f}', 'success')
+    try:
+        cantidad = int(request.form.get('cantidad') or 0)
+        # AQUÍ ESTÁ EL REGATEO: Recibimos el precio final que escribiste en el modal
+        precio_final = float(request.form.get('precio_final') or repuesto.precio) 
+    except ValueError:
+        flash('Error: Datos numéricos inválidos.', 'danger')
+        return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
+    
+    if cantidad > repuesto.cantidad:
+        flash('Error: Stock insuficiente.', 'danger')
         return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
         
-    return render_template('form_venta.html', repuesto=repuesto, q=q, orden=orden, page=page)
+    # Cálculos con el PRECIO REGATEADO
+    total_pagar = precio_final * cantidad
+    ganancia = (precio_final - repuesto.costo) * cantidad
+    
+    repuesto.cantidad -= cantidad
+    
+    nueva_venta = Venta(
+        cantidad=cantidad, 
+        precio_unitario=precio_final, # Guardamos a cuánto se vendió realmente
+        costo_unitario=repuesto.costo, 
+        ganancia_total=ganancia, 
+        repuesto_nombre=repuesto.nombre, 
+        repuesto_codigo=repuesto.codigo
+    )
+    db.session.add(nueva_venta)
+    db.session.commit()
+    
+    flash(f'¡Venta registrada! Cobraste: S/{total_pagar:.2f}', 'success')
+    return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
 
 @main.route('/reservar/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -343,23 +369,48 @@ def gestion_reserva(id, accion):
         flash('Reserva cancelada. Stock devuelto.', 'warning')
     return redirect(url_for('main.lista_reservas'))
 
+# --- EN app/routes.py ---
+
 @main.route('/historial-ventas')
 @login_required
 def historial_ventas():
-    ventas = Venta.query.order_by(Venta.fecha.desc()).all()
+    # 1. Obtener ventas ordenadas cronológicamente para el gráfico
+    ventas_asc = Venta.query.order_by(Venta.fecha.asc()).all()
     nombres_meses = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio', 
                      7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+    
+    # Agrupar ganancias por mes para el gráfico
+    ganancias_mensuales = defaultdict(float)
+    for v in ventas_asc:
+        clave = f"{nombres_meses[v.fecha.month]} {str(v.fecha.year)[2:]}" # Ej: Enero 26
+        ganancias_mensuales[clave] += v.ganancia_total
+        
+    # Preparar listas para Chart.js (Ejes X e Y)
+    chart_labels = list(ganancias_mensuales.keys())
+    chart_data = list(ganancias_mensuales.values())
+
+    # 2. Obtener ventas ordenadas al revés para la lista detallada
+    ventas_desc = Venta.query.order_by(Venta.fecha.desc()).all()
     historial_agrupado = {}
-    for venta in ventas:
+    for venta in ventas_desc:
         clave = f"{nombres_meses[venta.fecha.month]} {venta.fecha.year}"
         if clave not in historial_agrupado:
             historial_agrupado[clave] = {'ventas': [], 'suma_ingresos': 0, 'suma_ganancia': 0}
         historial_agrupado[clave]['ventas'].append(venta)
         historial_agrupado[clave]['suma_ingresos'] += venta.precio_unitario * venta.cantidad
         historial_agrupado[clave]['suma_ganancia'] += venta.ganancia_total
-    total_ganancia_global = sum(v.ganancia_total for v in ventas)
-    return render_template('reporte_ventas.html', historial_agrupado=historial_agrupado, total_ganancia_global=total_ganancia_global)
+        
+    total_ganancia_global = sum(v.ganancia_total for v in ventas_desc)
+    total_ventas_count = len(ventas_desc)
 
+    # Enviamos los datos convertidos a JSON para que JavaScript los entienda
+    return render_template('reporte_ventas.html', 
+                           historial_agrupado=historial_agrupado, 
+                           total_ganancia_global=total_ganancia_global,
+                           total_ventas_count=total_ventas_count,
+                           chart_labels=json.dumps(chart_labels),
+                           chart_data=json.dumps(chart_data))
+    
 @main.route('/eliminar_venta/<int:id>', methods=['POST'])
 @login_required
 def eliminar_venta(id):

@@ -1,45 +1,172 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Tecnicmaq ECK</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            overflow: hidden; /* Evita scrollbars */
+        }
+        /* SECCIÓN IZQUIERDA (IMAGEN) */
+        .login-brand-section {
+            /* Imagen de fondo de taller moderno/tecnología. Cámbiala si deseas. */
+            background-image: url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            min-height: 100vh;
+        }
+        /* Capa oscura sobre la imagen para que el texto se lea bien */
+        .login-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.8), rgba(0, 0, 0, 0.9)); /* Azul a Negro */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem;
+            color: white;
+        }
 
-{% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card shadow-lg">
-            <div class="card-header bg-dark text-white text-center">
-                <h3>🔐 Iniciar Sesión</h3>
+        /* SECCIÓN DERECHA (FORMULARIO) */
+        .login-form-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f8f9fa; /* Fondo gris muy suave */
+        }
+        .login-card {
+            width: 100%;
+            max-width: 450px;
+            padding: 3rem;
+            background: white;
+            border-radius: 24px; /* Bordes muy redondeados */
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        }
+
+        /* Estilos de los Inputs Modernos (Floating Labels + Iconos) */
+        .input-group-text {
+            background: transparent;
+            border-right: none;
+            color: #6c757d;
+        }
+        .form-floating > .form-control {
+            border-left: none;
+            padding-left: 0.5rem;
+        }
+        .form-floating > .form-control:focus {
+            box-shadow: none;
+            border-color: #dee2e6;
+        }
+        .input-group:focus-within {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+            border-radius: 0.375rem;
+        }
+        .input-group:focus-within .input-group-text,
+        .input-group:focus-within .form-control {
+            border-color: #86b7fe;
+        }
+        .btn-login {
+            padding: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+        .btn-login:hover {
+            transform: translateY(-2px); /* Pequeño efecto de elevación */
+            box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid p-0">
+    <div class="row g-0">
+        
+        <div class="col-lg-6 d-none d-lg-block login-brand-section">
+            <div class="login-overlay">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="bg-white text-primary rounded-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px;">
+                        <i class="bi bi-tools fs-2"></i>
+                    </div>
+                    <div>
+                        <h1 class="fw-bold mb-0 ls-tight">TECNICMAQ</h1>
+                        <p class="mb-0 opacity-75 text-uppercase ls-1">ECK System</p>
+                    </div>
+                </div>
+                <h2 class="display-5 fw-bold mb-3">Control total de tu taller.</h2>
+                <p class="lead opacity-75">Gestiona inventario, ventas y reservas con precisión y eficiencia profesional.</p>
             </div>
-            <div class="card-body p-4">
+        </div>
+
+        <div class="col-lg-6 login-form-section">
+            <div class="login-card needs-validation">
                 
-                <div class="text-center mb-4">
-                    <img src="{{ url_for('static', filename='img/logo.png') }}" 
-                        alt="Logo Empresa" 
-                        style="max-width: 200px; height: auto;">
+                <div class="text-center d-lg-none mb-4">
+                     <div class="bg-primary text-white rounded-3 d-inline-flex align-items-center justify-content-center shadow-sm mb-2" style="width: 50px; height: 50px;">
+                        <i class="bi bi-tools fs-3"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark">Tecnicmaq ECK</h3>
                 </div>
 
-                <h4 class="text-center text-muted mb-4">Iniciar Sesión</h4>
-                
+                <div class="mb-5 text-center text-lg-start">
+                    <h3 class="fw-bold text-dark">Bienvenido de nuevo</h3>
+                    <p class="text-muted">Ingresa tus credenciales para acceder al sistema.</p>
+                </div>
+
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
-                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                            <div class="alert alert-{{ category }} d-flex align-items-center shadow-sm border-0 rounded-3 mb-4" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                                <div>{{ message }}</div>
+                            </div>
                         {% endfor %}
                     {% endif %}
                 {% endwith %}
 
-                <form method="POST" action="/login">
-                    <div class="mb-3">
-                        <label class="form-label">Usuario</label>
-                        <input type="text" name="username" class="form-control" required autofocus>
+                <form method="POST">
+                    
+                    <div class="input-group mb-3 border rounded-3 bg-white overflow-hidden">
+                        <span class="input-group-text ps-3"><i class="bi bi-person fs-5"></i></span>
+                        <div class="form-floating flex-grow-1">
+                            <input type="text" class="form-control shadow-none" id="usernameInput" name="username" placeholder="Usuario" required>
+                            <label for="usernameInput">Nombre de Usuario</label>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Contraseña</label>
-                        <input type="password" name="password" class="form-control" required>
+
+                    <div class="input-group mb-4 border rounded-3 bg-white overflow-hidden">
+                        <span class="input-group-text ps-3"><i class="bi bi-lock fs-5"></i></span>
+                        <div class="form-floating flex-grow-1">
+                            <input type="password" class="form-control shadow-none" id="passwordInput" name="password" placeholder="Contraseña" required>
+                            <label for="passwordInput">Contraseña</label>
+                        </div>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">Entrar</button>
+
+                    <button type="submit" class="btn btn-primary w-100 btn-login shadow-sm mb-4">
+                        Acceder al Sistema <i class="bi bi-arrow-right ms-2"></i>
+                    </button>
+
+                    <div class="text-center text-muted small">
+                        &copy; {{ datetime.now().year }} Tecnicmaq ECK System. Todos los derechos reservados.
                     </div>
                 </form>
             </div>
         </div>
+
     </div>
 </div>
-{% endblock %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

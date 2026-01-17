@@ -2,108 +2,255 @@
 
 {% block content %}
 <style>
-    .img-zoom { width: 60px; height: 60px; object-fit: cover; transition: transform 0.2s ease; cursor: pointer; border-radius: 4px; }
-    .img-zoom:hover { transform: scale(3.5); z-index: 1000; border: 2px solid white; box-shadow: 0 5px 15px rgba(0,0,0,0.5); position: relative; }
-    .table-responsive { overflow: visible !important; }
+    /* Imágenes con zoom */
+    .img-zoom { width: 50px; height: 50px; object-fit: cover; transition: transform 0.2s ease; cursor: pointer; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .img-zoom:hover { transform: scale(4); z-index: 1000; border: 3px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; }
+    
+    /* Barra Superior */
+    .header-bar { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+    .btn-pill { border-radius: 50px; padding-left: 1.5rem; padding-right: 1.5rem; }
+    .input-excel { max-width: 220px; border-radius: 8px 0 0 8px !important; border-color: #dee2e6; }
+    .btn-upload { border-radius: 0 8px 8px 0 !important; }
+
+    /* Buscador Cápsula */
+    .search-capsule { transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); border: 2px solid transparent; }
+    .search-capsule:focus-within { border-color: #86b7fe; box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15) !important; transform: translateY(-2px); }
+    .search-capsule:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important; }
+    .input-clean { outline: none; box-shadow: none !important; }
+    .input-clean::placeholder { color: #adb5bd; font-weight: 400; }
+    
+    /* TABLA MODERNA */
+    .table-modern { border-collapse: separate; border-spacing: 0; }
+    .table-modern thead th { background-color: #f8f9fa; color: #6c757d; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px; padding: 1.2rem 1rem; border-bottom: 2px solid #e9ecef; }
+    .table-modern tbody td { padding: 1rem 1rem; vertical-align: middle; border-bottom: 1px solid #f1f3f5; background-color: white; transition: background-color 0.2s; }
+    .table-modern tbody tr:hover td { background-color: #fcfcfc; }
+    .table-modern tbody tr:last-child td { border-bottom: none; }
+    .table-responsive { overflow: visible !important; border-radius: 16px; }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold text-dark">Inventario</h2>
-    <div class="d-flex gap-2 align-items-center">
-        <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-primary btn-sm shadow-sm"><i class="bi bi-download"></i> Excel</a>
-        <form action="{{ url_for('main.importar_excel') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
-            <input type="file" name="archivo_excel" class="form-control form-control-sm" accept=".xlsx, .xls" required style="width: 200px;">
-            <button type="submit" class="btn btn-warning btn-sm text-dark shadow-sm"><i class="bi bi-file-earmark-spreadsheet"></i> Subir</button>
+<div class="header-bar p-4 mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+            <i class="bi bi-box-seam fs-3"></i>
+        </div>
+        <div>
+            <h3 class="fw-bold text-dark mb-0">Inventario</h3>
+            <small class="text-muted">Gestión de repuestos y stock</small>
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-outline-secondary btn-sm shadow-sm" title="Descargar todo el inventario"><i class="bi bi-download"></i> <span class="d-none d-md-inline">Reporte</span></a>
+        <div class="vr mx-1 text-muted"></div> 
+        <form action="{{ url_for('main.importar_excel') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center">
+            <div class="input-group input-group-sm shadow-sm">
+                <input type="file" name="archivo_excel" class="form-control input-excel" accept=".xlsx, .xls" required>
+                <button type="submit" class="btn btn-dark btn-upload" title="Subir archivo ahora"><i class="bi bi-cloud-arrow-up-fill"></i></button>
+            </div>
         </form>
         {% if session.get('ultimo_lote_id') %}
-            <a href="{{ url_for('main.deshacer_carga') }}" class="btn btn-outline-danger btn-sm shadow-sm animate-pulse"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</a>
+            <a href="{{ url_for('main.deshacer_carga') }}" class="btn btn-danger btn-sm shadow-sm animate-pulse rounded-3 ms-2"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</a>
         {% endif %}
-        <a href="/agregar" class="btn btn-success shadow-sm"><i class="bi bi-plus-circle"></i> + Nuevo</a>
+        <a href="/agregar" class="btn btn-success shadow btn-pill fw-bold ms-2"><i class="bi bi-plus-lg"></i> Nuevo</a>
     </div>
 </div>
 
-<div class="card shadow-sm mb-4 border-0 bg-light">
-    <div class="card-body py-3">
-        <form action="{{ url_for('main.inventario') }}" method="GET" class="row g-2 align-items-center" id="formFiltros">
-            <div class="col-md-8">
-                <div class="input-group">
-                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                    <input type="text" id="inputBusqueda" name="q" value="{{ busqueda }}" class="form-control form-control-lg border-start-0" placeholder="Escribe para buscar (Ej: foco led)..." autocomplete="off">
+<div class="row justify-content-center mb-4 position-relative" style="z-index: 10;">
+    <div class="col-lg-10">
+        <form action="{{ url_for('main.inventario') }}" method="GET" id="formFiltros">
+            <div class="search-capsule bg-white rounded-pill shadow-sm p-2 d-flex align-items-center border">
+                <div class="ps-3 pe-2 text-primary"><i class="bi bi-search fs-5"></i></div>
+                <input type="text" id="inputBusqueda" name="q" value="{{ busqueda }}" class="form-control border-0 bg-transparent input-clean fs-5 py-2" placeholder="Buscar repuesto, código o marca..." autocomplete="off">
+                {% if busqueda %}
+                <a href="{{ url_for('main.inventario') }}" class="btn btn-light rounded-circle text-muted me-2" style="width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;" title="Limpiar"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+                <div class="vr h-50 mx-2 text-muted opacity-25 d-none d-md-block"></div>
+                <div class="dropdown me-1 d-none d-md-block">
+                    <button class="btn btn-white border-0 text-end fw-bold text-dark d-flex align-items-center gap-3 dropdown-toggle py-2 px-3 rounded-pill" type="button" data-bs-toggle="dropdown">
+                        <div class="d-flex flex-column lh-1 text-end">
+                            <span class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Ordenar por</span>
+                            <span class="text-primary">
+                                {% if orden_actual == 'nombre_asc' %}A - Z
+                                {% elif orden_actual == 'nombre_desc' %}Z - A
+                                {% elif orden_actual == 'precio_alto' %}Mayor Precio
+                                {% elif orden_actual == 'precio_bajo' %}Menor Precio
+                                {% elif orden_actual == 'stock_bajo' %}Menor Stock
+                                {% else %}Recientes{% endif %}
+                            </span>
+                        </div>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-4 p-2 mt-2" style="min-width: 200px;">
+                        <li><h6 class="dropdown-header small text-uppercase fw-bold text-muted ps-3">Criterio de Orden</h6></li>
+                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'defecto' }}" type="submit" name="orden" value="defecto"><i class="bi bi-clock-history"></i> Recientes</button></li>
+                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'nombre_asc' }}" type="submit" name="orden" value="nombre_asc"><i class="bi bi-sort-alpha-down"></i> Nombre (A-Z)</button></li>
+                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'precio_bajo' }}" type="submit" name="orden" value="precio_bajo"><i class="bi bi-piggy-bank"></i> Precio Bajo</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item rounded-3 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'stock_bajo' }}" type="submit" name="orden" value="stock_bajo"><i class="bi bi-exclamation-triangle text-warning"></i> Stock Crítico</button></li>
+                    </ul>
                 </div>
+                <button type="submit" class="btn btn-primary rounded-circle shadow-sm ms-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 50px; height: 50px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"><i class="bi bi-search fs-5"></i></button>
             </div>
-            <div class="col-md-4">
-                <select name="orden" class="form-select form-select-lg" onchange="this.form.submit()">
-                    <option value="defecto" {% if orden_actual == 'defecto' %}selected{% endif %}>📅 Recientes</option>
-                    <option value="nombre_asc" {% if orden_actual == 'nombre_asc' %}selected{% endif %}>🔤 Nombre (A-Z)</option>
-                    <option value="precio_alto" {% if orden_actual == 'precio_alto' %}selected{% endif %}>💲 Precio (Alto-Bajo)</option>
-                    <option value="stock_bajo" {% if orden_actual == 'stock_bajo' %}selected{% endif %}>⚠️ Stock (Bajo-Alto)</option>
-                </select>
+            {% if mensaje_sugerencia %}
+            <div class="text-center mt-3 animate-pulse">
+                <span class="badge bg-white text-primary border px-3 py-2 rounded-pill shadow-sm"><i class="bi bi-lightbulb-fill me-1 text-warning"></i> {{ mensaje_sugerencia }}</span>
             </div>
+            {% endif %}
         </form>
     </div>
 </div>
 
-<div class="card shadow border-0">
-    <div class="card-body p-0">
-        {% if mensaje_sugerencia %}
-        <div class="alert alert-info d-flex align-items-center mb-3 shadow-sm" role="alert">
-            <i class="bi bi-lightbulb-fill me-2 fs-4"></i>
-            <div>
-                <strong>¡Ojo!</strong> {{ mensaje_sugerencia }}
-            </div>
-        </div>
-        {% endif %}
-            <table class="table table-hover table-striped mb-0 align-middle">
-                <thead class="table-dark small text-uppercase">
-                    <tr><th>Foto</th><th>Código</th><th>Nombre / Marca</th><th class="text-center">Stock</th><th>Costo</th><th>P. Venta</th><th>Margen</th><th class="text-end">Acciones</th></tr>
-                </thead>
-                <tbody id="tablaCuerpo">
-                    {% include 'tabla_repuestos.html' %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <div class="card-footer bg-white border-top-0 py-3">
-        <nav>
-            <ul class="pagination justify-content-center mb-0">
-                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
-                </li>
-                <li class="page-item disabled"><span class="page-link">Página {{ pagination.page }} de {{ pagination.pages }}</span></li>
-                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>
-                </li>
-            </ul>
-        </nav>
-    </div>
+<div id="contenedor-inventario" class="card shadow-sm border-0 rounded-4">
+    {% include 'tabla_repuestos.html' %}
 </div>
 
 <script>
-    let timeout = null;
-    const input = document.getElementById('inputBusqueda');
-    const tabla = document.getElementById('tablaCuerpo');
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Sistema de Inventario Iniciado");
 
-    input.addEventListener('input', function() {
-        // Limpiamos el reloj anterior para no buscar por cada letra, sino cuando dejes de escribir un poquito
-        clearTimeout(timeout);
+        // --- BÚSQUEDA EN VIVO Y URL ---
+        let timeout = null;
+        const input = document.getElementById('inputBusqueda');
+        const contenedor = document.getElementById('contenedor-inventario');
 
-        // Esperamos 300ms después de que dejes de escribir
-        timeout = setTimeout(() => {
-            const texto = input.value;
-            
-            // Hacemos la petición al servidor sin recargar la página
-            fetch(`/inventario?q=${encodeURIComponent(texto)}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => response.text())
-            .then(html => {
-                // Reemplazamos el cuerpo de la tabla con el nuevo HTML
-                tabla.innerHTML = html;
-            })
-            .catch(error => console.error('Error:', error));
-            
-        }, 300);
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                const texto = input.value;
+                
+                // 1. Actualizamos la URL silenciosamente (Sin recargar)
+                const url = new URL(window.location);
+                url.searchParams.set('q', texto);
+                url.searchParams.set('page', 1); // Al buscar, siempre volvemos a pág 1
+                window.history.replaceState({}, '', url);
+
+                // 2. Pedimos la nueva tabla al servidor
+                fetch(`/inventario?q=${encodeURIComponent(texto)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(response => response.text())
+                .then(html => {
+                    // Reemplazamos TODO (Tabla + Paginación)
+                    contenedor.innerHTML = html;
+                })
+                .catch(error => console.error('Error:', error));
+            }, 300);
+        });
+
+        // --- MODAL VENTA (Delegación de eventos para elementos dinámicos) ---
+        // Usamos el 'document' porque la tabla se destruye y crea de nuevo al buscar
+        const modalVenta = document.getElementById('modalVenta');
+        if (modalVenta) {
+            modalVenta.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                
+                const id = button.getAttribute('data-id');
+                const nombre = button.getAttribute('data-nombre');
+                const precio = parseFloat(button.getAttribute('data-precio')) || 0;
+                const stock = parseInt(button.getAttribute('data-stock')) || 0;
+                
+                document.getElementById('ventaNombreProducto').textContent = nombre;
+                document.getElementById('ventaStock').textContent = stock;
+                document.getElementById('ventaPrecioInput').value = precio.toFixed(2); 
+                document.getElementById('ventaCantidadInput').value = 1;
+                document.getElementById('ventaCantidadInput').max = stock;
+                
+                // LEEMOS LA URL ACTUALIZADA para saber a dónde volver
+                const params = new URLSearchParams(window.location.search);
+                const q = params.get('q') || '';
+                const orden = params.get('orden') || 'defecto';
+                const page = params.get('page') || 1;
+                
+                document.getElementById('formVenta').action = `/vender/${id}?q=${q}&orden=${orden}&page=${page}`;
+                actualizarTotal();
+            });
+        }
+
+        const inpCant = document.getElementById('ventaCantidadInput');
+        const inpPrec = document.getElementById('ventaPrecioInput');
+        const dispTot = document.getElementById('ventaTotalDisplay');
+        function actualizarTotal() {
+            if(inpCant && inpPrec && dispTot) {
+                const c = parseFloat(inpCant.value) || 0;
+                const p = parseFloat(inpPrec.value) || 0;
+                dispTot.textContent = (c * p).toFixed(2);
+            }
+        }
+        if(inpCant) inpCant.addEventListener('input', actualizarTotal);
+        if(inpPrec) inpPrec.addEventListener('input', actualizarTotal);
+
+        // --- MODAL EDITAR ---
+        const modalEditar = document.getElementById('modalEditar');
+        if (modalEditar) {
+            modalEditar.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const id = button.getAttribute('data-id');
+                
+                document.getElementById('editCodigo').value = button.getAttribute('data-codigo');
+                document.getElementById('editNombre').value = button.getAttribute('data-nombre');
+                document.getElementById('editMarca').value = button.getAttribute('data-marca');
+                document.getElementById('editCantidad').value = button.getAttribute('data-cantidad');
+                document.getElementById('editCosto').value = button.getAttribute('data-costo');
+                document.getElementById('editPrecio').value = button.getAttribute('data-precio');
+                
+                const params = new URLSearchParams(window.location.search);
+                const q = params.get('q') || '';
+                const orden = params.get('orden') || 'defecto';
+                const page = params.get('page') || 1;
+                
+                document.getElementById('formEditar').action = `/editar/${id}?q=${q}&orden=${orden}&page=${page}`;
+            });
+        }
     });
 </script>
+
+<div class="modal fade" id="modalVenta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cart-check-fill"></i> Nueva Venta</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formVenta" method="POST">
+                <div class="modal-body p-4">
+                    <h5 id="ventaNombreProducto" class="text-center fw-bold mb-1">Nombre Producto</h5>
+                    <p class="text-center text-muted mb-4">Stock disponible: <span id="ventaStock" class="badge bg-secondary">0</span></p>
+                    <div class="row g-3">
+                        <div class="col-6"><label class="form-label fw-bold">Cantidad</label><input type="number" name="cantidad" class="form-control form-control-lg text-center" value="1" min="1" required id="ventaCantidadInput"></div>
+                        <div class="col-6"><label class="form-label fw-bold text-success">Precio Final (S/)</label><input type="number" step="0.01" name="precio_final" id="ventaPrecioInput" class="form-control form-control-lg text-center fw-bold text-success" required><div class="form-text text-center small">Puedes editar este precio.</div></div>
+                    </div>
+                    <div class="alert alert-light border mt-3 text-center">Total a Cobrar: <strong class="fs-4 text-dark">S/<span id="ventaTotalDisplay">0.00</span></strong></div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4">Confirmar Venta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square"></i> Editar Repuesto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditar" method="POST" enctype="multipart/form-data">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-3"><label class="form-label small text-muted">Código</label><input type="text" name="codigo" id="editCodigo" class="form-control fw-bold"></div>
+                        <div class="col-md-9"><label class="form-label small text-muted">Nombre</label><input type="text" name="nombre" id="editNombre" class="form-control fw-bold"></div>
+                        <div class="col-md-6"><label class="form-label small text-muted">Marca</label><input type="text" name="marca" id="editMarca" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label small text-muted">Imagen Nueva (Opcional)</label><input type="file" name="imagen" class="form-control form-control-sm"></div>
+                        <div class="col-md-4"><label class="form-label fw-bold">Stock</label><input type="number" name="cantidad" id="editCantidad" class="form-control bg-light"></div>
+                        <div class="col-md-4"><label class="form-label fw-bold">Costo (S/)</label><input type="number" step="0.01" name="costo" id="editCosto" class="form-control"></div>
+                        <div class="col-md-4"><label class="form-label fw-bold text-success">Precio Venta (S/)</label><input type="number" step="0.01" name="precio" id="editPrecio" class="form-control border-success"></div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary px-4">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

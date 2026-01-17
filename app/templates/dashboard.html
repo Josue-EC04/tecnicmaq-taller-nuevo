@@ -1,97 +1,108 @@
 {% extends "base.html" %}
 
 {% block content %}
-
-<div class="row mb-4 align-items-center">
-    <div class="col-md-8">
-        <h2 class="fw-bold text-dark">Panel de Control</h2>
-        <p class="text-muted">Resumen del estado actual del taller.</p>
+<div class="bg-white p-4 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between">
+    <div>
+        <h2 class="fw-bold text-dark mb-1">Hola, {{ current_user.username }} 👋</h2>
+        <p class="text-muted mb-0">Aquí tienes el resumen de tu taller hoy.</p>
     </div>
-    <div class="col-md-4 text-end">
-        <span class="badge bg-light text-dark border p-2">
-            📅 Fecha: <span id="fecha-actual"></span>
-        </span>
+    <div class="text-end d-none d-md-block bg-light px-3 py-2 rounded-pill border">
+        <i class="bi bi-calendar-event text-primary me-2"></i>
+        <span class="fw-bold text-dark">{{ datetime.now().strftime('%d de %B, %Y') }}</span>
     </div>
 </div>
 
-<div class="row mb-4">
-    
-    <div class="col-md-3 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-bold">Total Repuestos</div>
-                <div class="display-5 fw-bold text-dark">{{ total_tipos }}</div>
-                <small class="text-muted">Tipos registrados</small>
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden card-hover">
+            <div class="card-body p-3 d-flex align-items-center gap-3 bg-primary bg-opacity-10 border-bottom border-primary border-3">
+                <div class="bg-primary text-white rounded-circle p-3 shadow-sm"><i class="bi bi-box-seam fs-3"></i></div>
+                <div>
+                    <h6 class="text-primary fw-bold mb-0 text-uppercase ls-1">Inventario</h6>
+                    <h2 class="fw-bold mb-0 display-6">{{ total_tipos }} <small class="fs-6 text-muted">Tipos</small></h2>
+                </div>
             </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-bold">Valor Inventario</div>
-                <div class="display-6 fw-bold text-success">S/{{ "{:,.2f}".format(valor_inventario) }}</div>
-                <small class="text-muted">Capital en stock</small>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-bold">Reservas Activas</div>
-                <div class="display-5 fw-bold text-dark">{{ total_reservas }}</div>
-                <a href="/reservas" class="text-decoration-none small text-warning stretched-link">Ver pendientes &rarr;</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
-            <div class="card-body">
-                <div class="text-danger small text-uppercase fw-bold">⚠️ Stock Crítico</div>
-                <div class="display-5 fw-bold text-danger">{{ alertas_stock }}</div>
-                <small class="text-muted">Productos con < 5 unidades</small>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card shadow border-0 h-100">
-            <div class="card-header bg-white fw-bold">⚡ Accesos Rápidos</div>
-            <div class="card-body d-grid gap-3">
-                <a href="/agregar" class="btn btn-outline-primary btn-lg text-start shadow-sm">
-                    <span class="fs-4 me-2">+</span> Registrar Nuevo Repuesto
+            <div class="bg-white p-3">
+                {% if alertas_stock > 0 %}
+                <a href="{{ url_for('main.inventario', orden='stock_bajo') }}" class="d-flex align-items-center text-danger text-decoration-none bg-danger bg-opacity-10 px-3 py-2 rounded-3 fw-bold animate-pulse">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ alertas_stock }} con Stock Bajo
                 </a>
-                <a href="/inventario" class="btn btn-outline-dark btn-lg text-start shadow-sm">
-                    <span class="fs-4 me-2">🔍</span> Buscar en Inventario
-                </a>
-                <button class="btn btn-light btn-lg text-start text-muted border" disabled>
-                    <span class="fs-4 me-2">📊</span> Reporte de Ventas (Próximamente)
-                </button>
+                {% else %}
+                <div class="text-success fw-bold d-flex align-items-center"><i class="bi bi-check-circle-fill me-2"></i> Stock saludable</div>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <div class="col-md-6 mb-4">
-        <div class="card shadow border-0 h-100 bg-dark text-white" 
-            style="background: linear-gradient(45deg, #1a1a1a, #2c3e50);">
-            <div class="card-body d-flex flex-column justify-content-center align-items-center text-center p-5">
-                
-                <img src="{{ url_for('static', filename='img/logo.png') }}" 
-                    alt="Logo" class="img-fluid mb-3 rounded" style="max-height: 100px;">
-                <h3>Sistema de Gestión</h3>
-                <p class="text-white-50">Tecnicmaq ECK - Ingeniería Técnica</p>
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden card-hover">
+            <div class="card-body p-3 d-flex align-items-center gap-3 bg-warning bg-opacity-10 border-bottom border-warning border-3">
+                <div class="bg-warning text-white rounded-circle p-3 shadow-sm"><i class="bi bi-calendar-check fs-3"></i></div>
+                <div>
+                    <h6 class="text-warning fw-bold mb-0 text-uppercase ls-1">Reservas</h6>
+                    <h2 class="fw-bold mb-0 display-6">{{ total_reservas }} <small class="fs-6 text-muted">Pend.</small></h2>
+                </div>
             </div>
+            <div class="bg-white p-3">
+                <a href="{{ url_for('main.lista_reservas') }}" class="btn btn-outline-warning w-100 fw-bold rounded-pill btn-sm">Ver Reservas <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden card-hover">
+            <div class="card-body p-3 d-flex align-items-center gap-3 bg-success bg-opacity-10 border-bottom border-success border-3">
+                <div class="bg-success text-white rounded-circle p-3 shadow-sm"><i class="bi bi-cash-stack fs-3"></i></div>
+                <div>
+                    <h6 class="text-success fw-bold mb-0 text-uppercase ls-1">Ingresos Hoy</h6>
+                    <h2 class="fw-bold mb-0 text-success">S/{{ "%.0f"|format(ingreso_hoy_total) }}</h2>
+                </div>
+            </div>
+            <div class="bg-white p-3 d-flex align-items-center text-muted small fw-bold">
+                <i class="bi bi-receipt me-2 fs-5 text-success"></i> {{ ventas_hoy_count }} ventas registradas hoy.
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 rounded-4 card-hover">
+            <div class="card-header bg-white border-0 fw-bold py-3 d-flex align-items-center text-dark">
+                <i class="bi bi-trophy-fill text-warning me-2 fs-5"></i> Top 3 Más Vendidos
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for nombre, total in top_ventas %}
+                <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2 border-0 border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% else %}🥉{% endif %}
+                        <span class="text-truncate fw-semibold" style="max-width: 140px;">{{ nombre }}</span>
+                    </div>
+                    <span class="badge bg-primary rounded-pill px-2">{{ total }} uds.</span>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted text-center py-3">Aún no hay ventas suficientes.</li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
 </div>
 
-<script>
-    const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('fecha-actual').innerText = new Date().toLocaleDateString('es-ES', opciones);
-</script>
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-dark text-white">
+    <div class="card-body p-4 d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-white bg-opacity-25 p-3 rounded-circle"><i class="bi bi-piggy-bank-fill fs-2"></i></div>
+            <div>
+                <h5 class="opacity-75 text-uppercase ls-1 mb-1">Valor Total del Inventario (Costo)</h5>
+                <h1 class="fw-bold mb-0 display-5">S/{{ "%.2f"|format(valor_inventario) }}</h1>
+            </div>
+        </div>
+        <i class="bi bi-graph-up-arrow display-1 opacity-25 d-none d-md-block"></i>
+    </div>
+</div>
 
+<style>
+    .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+    .card-hover:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
+    .ls-1 { letter-spacing: 1px; }
+    .animate-pulse { animation: pulse 2s infinite; }
+</style>
 {% endblock %}

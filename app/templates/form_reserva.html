@@ -1,37 +1,62 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h4 class="mb-0">Reservar Repuesto</h4>
+<div class="row justify-content-center py-5">
+    <div class="col-md-5">
+        
+        <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="card-header text-dark p-4 border-0" style="background: #ffc107;">
+                <div class="text-center">
+                    <div class="bg-white bg-opacity-50 rounded-circle d-inline-flex p-3 mb-2 shadow-sm">
+                        <i class="bi bi-clock-history fs-1 text-dark"></i>
+                    </div>
+                    <h3 class="fw-bold mb-0">Reservar Repuesto</h3>
+                    <p class="mb-0 text-dark text-opacity-75">Apartar producto para un cliente.</p>
+                </div>
             </div>
-            <div class="card-body">
-                <h5 class="card-title">{{ repuesto.nombre }} ({{ repuesto.codigo }})</h5>
-                <p class="text-muted">Stock disponible: {{ repuesto.cantidad }}</p>
-                <hr>
+
+            <div class="card-body p-4 bg-white">
                 
+                <div class="d-flex align-items-center bg-light p-3 rounded-3 mb-4 border">
+                    <img src="{{ url_for('static', filename='uploads/' + repuesto.imagen_filename) }}" class="rounded me-3 shadow-sm" width="60" height="60" style="object-fit: cover;">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-truncate" style="max-width: 200px;">{{ repuesto.nombre }}</h6>
+                        <small class="text-muted">{{ repuesto.codigo }}</small>
+                        <div class="badge bg-dark text-white rounded-pill ms-2">Stock: {{ repuesto.cantidad }}</div>
+                    </div>
+                </div>
+
                 <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Nombre del Cliente / Mecánico</label>
-                        <input type="text" name="cliente" class="form-control" placeholder="Ej: Juan Pérez" required>
+                    
+                    <div class="form-floating mb-3">
+                        <input type="text" name="cliente" class="form-control rounded-3" id="inputCliente" placeholder="Nombre" required autofocus>
+                        <label for="inputCliente">Nombre del Cliente</label>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Teléfono (Opcional)</label>
-                        <input type="text" name="telefono" class="form-control" placeholder="Ej: 099...">
+
+                    <div class="form-floating mb-3">
+                        <input type="text" name="telefono" class="form-control rounded-3" id="inputTel" placeholder="Teléfono">
+                        <label for="inputTel">Teléfono / Contacto</label>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Cantidad a Apartar</label>
-                        <input type="number" name="cantidad" class="form-control" value="1" min="1" max="{{ repuesto.cantidad }}" required>
+
+                    <label class="form-label fw-bold small text-secondary mt-2">CANTIDAD A APARTAR</label>
+                    <div class="input-group mb-4">
+                        <button class="btn btn-outline-secondary" type="button" onclick="this.parentNode.querySelector('input[type=number]').stepDown()">-</button>
+                        <input type="number" name="cantidad" class="form-control text-center fw-bold fs-5" value="1" min="1" max="{{ repuesto.cantidad }}" required>
+                        <button class="btn btn-outline-secondary" type="button" onclick="this.parentNode.querySelector('input[type=number]').stepUp()">+</button>
                     </div>
+
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-warning">Confirmar Reserva</button>
-                        <a href="/inventario" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-warning btn-lg fw-bold shadow-sm">
+                            Confirmar Reserva
+                        </button>
+                        <a href="{{ url_for('main.inventario', q=q, orden=orden, page=page) }}" class="btn btn-light text-muted">
+                            Cancelar
+                        </a>
                     </div>
                 </form>
             </div>
         </div>
+
     </div>
 </div>
 {% endblock %}
