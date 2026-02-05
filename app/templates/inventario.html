@@ -2,16 +2,14 @@
 
 {% block content %}
 <style>
-    /* Imágenes con zoom */
+    /* Estilos de Zoom y Barra (Igual que antes) */
     .img-zoom { width: 50px; height: 50px; object-fit: cover; transition: transform 0.2s ease; cursor: pointer; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .img-zoom:hover { transform: scale(4); z-index: 1000; border: 3px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; }
-    
-    /* Barra Superior */
     .header-bar { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
     .btn-pill { border-radius: 50px; padding-left: 1.5rem; padding-right: 1.5rem; }
     .input-excel { max-width: 220px; border-radius: 8px 0 0 8px !important; border-color: #dee2e6; }
     .btn-upload { border-radius: 0 8px 8px 0 !important; }
-
+    
     /* Buscador Cápsula */
     .search-capsule { transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); border: 2px solid transparent; }
     .search-capsule:focus-within { border-color: #86b7fe; box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15) !important; transform: translateY(-2px); }
@@ -19,7 +17,7 @@
     .input-clean { outline: none; box-shadow: none !important; }
     .input-clean::placeholder { color: #adb5bd; font-weight: 400; }
     
-    /* TABLA MODERNA */
+    /* Tabla y Utilidades */
     .table-modern { border-collapse: separate; border-spacing: 0; }
     .table-modern thead th { background-color: #f8f9fa; color: #6c757d; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px; padding: 1.2rem 1rem; border-bottom: 2px solid #e9ecef; }
     .table-modern tbody td { padding: 1rem 1rem; vertical-align: middle; border-bottom: 1px solid #f1f3f5; background-color: white; transition: background-color 0.2s; }
@@ -39,12 +37,12 @@
         </div>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-outline-secondary btn-sm shadow-sm" title="Descargar todo el inventario"><i class="bi bi-download"></i> <span class="d-none d-md-inline">Reporte</span></a>
+        <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-outline-secondary btn-sm shadow-sm" title="Descargar Reporte"><i class="bi bi-download"></i> <span class="d-none d-md-inline">Reporte</span></a>
         <div class="vr mx-1 text-muted"></div> 
         <form action="{{ url_for('main.importar_excel') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center">
             <div class="input-group input-group-sm shadow-sm">
                 <input type="file" name="archivo_excel" class="form-control input-excel" accept=".xlsx, .xls" required>
-                <button type="submit" class="btn btn-dark btn-upload" title="Subir archivo ahora"><i class="bi bi-cloud-arrow-up-fill"></i></button>
+                <button type="submit" class="btn btn-dark btn-upload" title="Subir"><i class="bi bi-cloud-arrow-up-fill"></i></button>
             </div>
         </form>
         {% if session.get('ultimo_lote_id') %}
@@ -56,19 +54,21 @@
 
 <div class="row justify-content-center mb-4 position-relative" style="z-index: 10;">
     <div class="col-lg-10">
-        <form action="{{ url_for('main.inventario') }}" method="GET" id="formFiltros">
+        <form id="formFiltros" onsubmit="return false;">
             <div class="search-capsule bg-white rounded-pill shadow-sm p-2 d-flex align-items-center border">
                 <div class="ps-3 pe-2 text-primary"><i class="bi bi-search fs-5"></i></div>
+                
                 <input type="text" id="inputBusqueda" name="q" value="{{ busqueda }}" class="form-control border-0 bg-transparent input-clean fs-5 py-2" placeholder="Buscar repuesto, código o marca..." autocomplete="off">
-                {% if busqueda %}
-                <a href="{{ url_for('main.inventario') }}" class="btn btn-light rounded-circle text-muted me-2" style="width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;" title="Limpiar"><i class="bi bi-x-lg"></i></a>
-                {% endif %}
+                
+                <button type="button" id="btnLimpiar" class="btn btn-light rounded-circle text-muted me-2" style="width: 35px; height: 35px; display: {{ 'flex' if busqueda else 'none' }}; align-items: center; justify-content: center;" title="Limpiar"><i class="bi bi-x-lg"></i></button>
+
                 <div class="vr h-50 mx-2 text-muted opacity-25 d-none d-md-block"></div>
+                
                 <div class="dropdown me-1 d-none d-md-block">
                     <button class="btn btn-white border-0 text-end fw-bold text-dark d-flex align-items-center gap-3 dropdown-toggle py-2 px-3 rounded-pill" type="button" data-bs-toggle="dropdown">
                         <div class="d-flex flex-column lh-1 text-end">
                             <span class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Ordenar por</span>
-                            <span class="text-primary">
+                            <span class="text-primary" id="textoOrdenActual">
                                 {% if orden_actual == 'nombre_asc' %}A - Z
                                 {% elif orden_actual == 'nombre_desc' %}Z - A
                                 {% elif orden_actual == 'precio_alto' %}Mayor Precio
@@ -80,20 +80,14 @@
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-4 p-2 mt-2" style="min-width: 200px;">
                         <li><h6 class="dropdown-header small text-uppercase fw-bold text-muted ps-3">Criterio de Orden</h6></li>
-                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'defecto' }}" type="submit" name="orden" value="defecto"><i class="bi bi-clock-history"></i> Recientes</button></li>
-                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'nombre_asc' }}" type="submit" name="orden" value="nombre_asc"><i class="bi bi-sort-alpha-down"></i> Nombre (A-Z)</button></li>
-                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'precio_bajo' }}" type="submit" name="orden" value="precio_bajo"><i class="bi bi-piggy-bank"></i> Precio Bajo</button></li>
+                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('defecto', 'Recientes')"><i class="bi bi-clock-history"></i> Recientes</button></li>
+                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('nombre_asc', 'Nombre (A-Z)')"><i class="bi bi-sort-alpha-down"></i> Nombre (A-Z)</button></li>
+                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('precio_bajo', 'Precio Bajo')"><i class="bi bi-piggy-bank"></i> Precio Bajo</button></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><button class="dropdown-item rounded-3 d-flex align-items-center gap-2 {{ 'active fw-bold' if orden_actual == 'stock_bajo' }}" type="submit" name="orden" value="stock_bajo"><i class="bi bi-exclamation-triangle text-warning"></i> Stock Crítico</button></li>
+                        <li><button class="dropdown-item rounded-3 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('stock_bajo', 'Stock Crítico')"><i class="bi bi-exclamation-triangle text-warning"></i> Stock Crítico</button></li>
                     </ul>
                 </div>
-                <button type="submit" class="btn btn-primary rounded-circle shadow-sm ms-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 50px; height: 50px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"><i class="bi bi-search fs-5"></i></button>
             </div>
-            {% if mensaje_sugerencia %}
-            <div class="text-center mt-3 animate-pulse">
-                <span class="badge bg-white text-primary border px-3 py-2 rounded-pill shadow-sm"><i class="bi bi-lightbulb-fill me-1 text-warning"></i> {{ mensaje_sugerencia }}</span>
-            </div>
-            {% endif %}
         </form>
     </div>
 </div>
@@ -103,43 +97,97 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log("Sistema de Inventario Iniciado");
+    // Variables globales de estado
+    let estadoActual = {
+        q: "{{ busqueda }}",
+        orden: "{{ orden_actual }}",
+        page: 1
+    };
 
-        // --- BÚSQUEDA EN VIVO Y URL ---
-        let timeout = null;
-        const input = document.getElementById('inputBusqueda');
-        const contenedor = document.getElementById('contenedor-inventario');
+    // Función MAESTRA para cargar datos sin ensuciar historial
+    function cargarInventario(params) {
+        // Actualizamos el estado global
+        estadoActual = { ...estadoActual, ...params };
+        
+        // Construimos la URL
+        const url = new URL(window.location.origin + "/inventario");
+        url.searchParams.set('q', estadoActual.q);
+        url.searchParams.set('orden', estadoActual.orden);
+        url.searchParams.set('page', estadoActual.page);
 
-        input.addEventListener('input', function() {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                const texto = input.value;
-                
-                // 1. Actualizamos la URL silenciosamente (Sin recargar)
-                const url = new URL(window.location);
-                url.searchParams.set('q', texto);
-                url.searchParams.set('page', 1); // Al buscar, siempre volvemos a pág 1
-                window.history.replaceState({}, '', url);
+        // 1. AJAX: Pedimos los datos
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(response => response.text())
+        .then(html => {
+            // 2. Actualizamos la vista
+            document.getElementById('contenedor-inventario').innerHTML = html;
+            
+            // 3. MAGIC TRICK: Reemplazamos la URL actual sin crear historial nuevo
+            window.history.replaceState({}, '', url);
+            
+            // 4. Reconectamos los eventos de paginación para que sean AJAX también
+            conectarPaginacionAjax();
+        })
+        .catch(error => console.error('Error cargando inventario:', error));
+    }
 
-                // 2. Pedimos la nueva tabla al servidor
-                fetch(`/inventario?q=${encodeURIComponent(texto)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(response => response.text())
-                .then(html => {
-                    // Reemplazamos TODO (Tabla + Paginación)
-                    contenedor.innerHTML = html;
-                })
-                .catch(error => console.error('Error:', error));
-            }, 300);
+    // Evento de búsqueda (Debounce)
+    let timeout = null;
+    const input = document.getElementById('inputBusqueda');
+    const btnLimpiar = document.getElementById('btnLimpiar');
+
+    input.addEventListener('input', function() {
+        clearTimeout(timeout);
+        // Mostrar/Ocultar botón X
+        btnLimpiar.style.display = input.value ? 'flex' : 'none';
+        
+        timeout = setTimeout(() => {
+            cargarInventario({ q: input.value, page: 1 }); // Al buscar, siempre página 1
+        }, 300);
+    });
+
+    // Evento Limpiar Búsqueda
+    btnLimpiar.addEventListener('click', function() {
+        input.value = '';
+        btnLimpiar.style.display = 'none';
+        cargarInventario({ q: '', page: 1 });
+    });
+
+    // Evento Cambiar Orden
+    window.cambiarOrden = function(nuevoOrden, textoOrden) {
+        document.getElementById('textoOrdenActual').innerText = textoOrden;
+        cargarInventario({ orden: nuevoOrden, page: 1 });
+    };
+
+    // Función para convertir los links de paginación normales en AJAX
+    function conectarPaginacionAjax() {
+        const links = document.querySelectorAll('.page-link');
+        links.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault(); // Evita la recarga normal
+                const href = this.getAttribute('href');
+                if (href && href !== '#') {
+                    // Extraemos el número de página de la URL del link
+                    const urlParams = new URLSearchParams(href.split('?')[1]);
+                    const nuevaPagina = urlParams.get('page');
+                    cargarInventario({ page: nuevaPagina });
+                }
+            });
         });
+    }
 
-        // --- MODAL VENTA (Delegación de eventos para elementos dinámicos) ---
-        // Usamos el 'document' porque la tabla se destruye y crea de nuevo al buscar
+    // Inicialización al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        conectarPaginacionAjax();
+
+        // --- LÓGICA MODALS (Venta y Editar) ---
+        // (Delegación de eventos para que funcionen tras recargar tabla)
+        
+        // VENTA
         const modalVenta = document.getElementById('modalVenta');
         if (modalVenta) {
             modalVenta.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
-                
                 const id = button.getAttribute('data-id');
                 const nombre = button.getAttribute('data-nombre');
                 const precio = parseFloat(button.getAttribute('data-precio')) || 0;
@@ -151,17 +199,18 @@
                 document.getElementById('ventaCantidadInput').value = 1;
                 document.getElementById('ventaCantidadInput').max = stock;
                 
-                // LEEMOS LA URL ACTUALIZADA para saber a dónde volver
-                const params = new URLSearchParams(window.location.search);
-                const q = params.get('q') || '';
-                const orden = params.get('orden') || 'defecto';
-                const page = params.get('page') || 1;
+                // Usamos la URL actual para el action
+                const currentUrl = new URLSearchParams(window.location.search);
+                const q = currentUrl.get('q') || '';
+                const orden = currentUrl.get('orden') || 'defecto';
+                const page = currentUrl.get('page') || 1;
                 
                 document.getElementById('formVenta').action = `/vender/${id}?q=${q}&orden=${orden}&page=${page}`;
                 actualizarTotal();
             });
         }
 
+        // Calculadora Venta
         const inpCant = document.getElementById('ventaCantidadInput');
         const inpPrec = document.getElementById('ventaPrecioInput');
         const dispTot = document.getElementById('ventaTotalDisplay');
@@ -175,13 +224,12 @@
         if(inpCant) inpCant.addEventListener('input', actualizarTotal);
         if(inpPrec) inpPrec.addEventListener('input', actualizarTotal);
 
-        // --- MODAL EDITAR ---
+        // EDITAR
         const modalEditar = document.getElementById('modalEditar');
         if (modalEditar) {
             modalEditar.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
                 const id = button.getAttribute('data-id');
-                
                 document.getElementById('editCodigo').value = button.getAttribute('data-codigo');
                 document.getElementById('editNombre').value = button.getAttribute('data-nombre');
                 document.getElementById('editMarca').value = button.getAttribute('data-marca');
@@ -189,10 +237,10 @@
                 document.getElementById('editCosto').value = button.getAttribute('data-costo');
                 document.getElementById('editPrecio').value = button.getAttribute('data-precio');
                 
-                const params = new URLSearchParams(window.location.search);
-                const q = params.get('q') || '';
-                const orden = params.get('orden') || 'defecto';
-                const page = params.get('page') || 1;
+                const currentUrl = new URLSearchParams(window.location.search);
+                const q = currentUrl.get('q') || '';
+                const orden = currentUrl.get('orden') || 'defecto';
+                const page = currentUrl.get('page') || 1;
                 
                 document.getElementById('formEditar').action = `/editar/${id}?q=${q}&orden=${orden}&page=${page}`;
             });
