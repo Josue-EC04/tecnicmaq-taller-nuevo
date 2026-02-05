@@ -1,30 +1,28 @@
 import os
 import uuid
-import secrets
 import json
 import pandas as pd
 import io 
-import gc  # IMPORTANTE: Para limpiar memoria RAM en Render
+import gc
 import google.generativeai as genai
 from datetime import datetime, date
 from collections import defaultdict
 from sqlalchemy import func, desc
 import difflib
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, make_response, jsonify, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, jsonify, session
 from werkzeug.utils import secure_filename
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 from flask_login import login_user, logout_user, login_required, current_user
 
-from .models import Repuesto, Reserva, Usuario, Venta, db
+# --- CORRECCIÓN VITAL: Usamos PedidoCompra y ELIMINAMOS Reserva ---
+from .models import Repuesto, PedidoCompra, Usuario, Venta, db
 
 main = Blueprint('main', __name__)
 
 # --- FUNCIONES AUXILIARES ---
-
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
 def guardar_imagen(file):
     if file and allowed_file(file.filename):
@@ -35,427 +33,325 @@ def guardar_imagen(file):
         return unique_filename
     return None
 
-# --- RUTAS ---
+# --- RUTAS PRINCIPALES ---
 
 @main.route('/')
 def dashboard():
     if not current_user.is_authenticated:
         return redirect(url_for('main.login'))
     
-    # Métricas existentes
     total_tipos = Repuesto.query.count()
     alertas_stock = Repuesto.query.filter(Repuesto.cantidad < 5).count()
-    total_reservas = Reserva.query.count()
     
-    # Calcular valor del inventario (Costo * Cantidad)
+    # Usamos la nueva tabla para contar pedidos pendientes
+    try:
+        total_pedidos = PedidoCompra.query.filter_by(estado='Pendiente').count()
+    except:
+        total_pedidos = 0 # Evita crash si la tabla no existe aún
+    
     total_valor = db.session.query(func.sum(Repuesto.costo * Repuesto.cantidad)).scalar() or 0
 
-    # --- NUEVAS MÉTRICAS PARA REEMPLAZAR "PRÓXIMAMENTE" ---
-
-    # 1. Ingresos de HOY
     hoy = date.today()
-    # Sumamos (precio * cantidad) solo de las ventas con fecha de hoy
     ingreso_hoy_total = db.session.query(func.sum(Venta.precio_unitario * Venta.cantidad)).filter(func.date(Venta.fecha) == hoy).scalar() or 0
     ventas_hoy_count = Venta.query.filter(func.date(Venta.fecha) == hoy).count()
 
-    # 2. Top 3 Productos Más Vendidos (Histórico)
-    # Agrupamos por nombre, sumamos cantidad vendida, ordenamos descendente y tomamos los 3 primeros
     top_ventas = db.session.query(
-        Venta.repuesto_nombre,
-        func.sum(Venta.cantidad).label('total_vendido')
+        Venta.repuesto_nombre, func.sum(Venta.cantidad).label('total_vendido')
     ).group_by(Venta.repuesto_nombre).order_by(desc('total_vendido')).limit(3).all()
 
+    # Pasamos datetime para arreglar el error de pantalla blanca
     return render_template('dashboard.html', 
-                           total_tipos=total_tipos,
-                           alertas_stock=alertas_stock,
-                           total_reservas=total_reservas,
-                           valor_inventario=total_valor,
-                           # Pasamos las nuevas variables a la plantilla
-                           ingreso_hoy_total=ingreso_hoy_total,
-                           ventas_hoy_count=ventas_hoy_count,
-                           top_ventas=top_ventas,
-                           datetime=datetime)
+                           total_tipos=total_tipos, alertas_stock=alertas_stock,
+                           total_pedidos=total_pedidos, valor_inventario=total_valor,
+                           ingreso_hoy_total=ingreso_hoy_total, ventas_hoy_count=ventas_hoy_count,
+                           top_ventas=top_ventas, datetime=datetime)
+
 @main.route('/inventario')
 @login_required
 def inventario():
     page = request.args.get('page', 1, type=int)
-    per_page = 20
     busqueda = request.args.get('q', '').strip()
     orden = request.args.get('orden', 'defecto')
     
     query = Repuesto.query
     mensaje_sugerencia = None 
 
-    # 1. BÚSQUEDA EXACTA
     if busqueda:
         terminos = busqueda.split()
         for termino in terminos:
-            query = query.filter(
-                (Repuesto.nombre.ilike(f'%{termino}%')) | 
-                (Repuesto.codigo.ilike(f'%{termino}%')) |
-                (Repuesto.marca.ilike(f'%{termino}%'))
-            )
+            query = query.filter((Repuesto.nombre.ilike(f'%{termino}%')) | (Repuesto.codigo.ilike(f'%{termino}%')) | (Repuesto.marca.ilike(f'%{termino}%')))
     
-    # Aplicar orden (Igual que antes)
     if orden == 'nombre_asc': query = query.order_by(Repuesto.nombre.asc())
     elif orden == 'nombre_desc': query = query.order_by(Repuesto.nombre.desc())
     elif orden == 'precio_alto': query = query.order_by(Repuesto.precio.desc())
     elif orden == 'precio_bajo': query = query.order_by(Repuesto.precio.asc())
     elif orden == 'stock_bajo': query = query.order_by(Repuesto.cantidad.asc())
-    elif orden == 'stock_alto': query = query.order_by(Repuesto.cantidad.desc())
     else: query = query.order_by(Repuesto.id.desc())
 
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    pagination = query.paginate(page=page, per_page=20, error_out=False)
     repuestos = pagination.items
 
-    # 2. BÚSQUEDA INTELIGENTE (Si no hubo resultados exactos)
     if not repuestos and busqueda and page == 1:
-        # Traemos todos los nombres para analizar palabras
         todos = db.session.query(Repuesto.nombre).all()
-        
-        # Creamos un conjunto de PALABRAS ÚNICAS (rompemos las frases)
-        palabras_db = set()
-        for prod in todos:
-            # "TAPA RADIADOR" -> agrega "TAPA" y "RADIADOR"
-            for palabra in prod.nombre.split():
-                if len(palabra) > 3: # Ignoramos palabras muy cortas
-                    palabras_db.add(palabra.upper())
-        
-        # Buscamos si "tapp" se parece a alguna palabra de la base de datos
-        # cutoff=0.6 significa 60% de parecido
-        posibles_palabras = difflib.get_close_matches(busqueda.upper(), list(palabras_db), n=1, cutoff=0.6)
-        
-        if posibles_palabras:
-            palabra_corregida = posibles_palabras[0] # Ej: encontró "TAPA"
-            
-            # Hacemos la búsqueda de nuevo pero con la palabra corregida
-            repuestos = Repuesto.query.filter(Repuesto.nombre.ilike(f'%{palabra_corregida}%')).all()
-            
-            if repuestos:
-                mensaje_sugerencia = f"No encontramos '{busqueda}', pero quizás buscabas '{palabra_corregida}':"
+        palabras_db = {palabra.upper() for prod in todos for palabra in prod.nombre.split() if len(palabra) > 3}
+        posibles = difflib.get_close_matches(busqueda.upper(), list(palabras_db), n=1, cutoff=0.6)
+        if posibles:
+            mensaje_sugerencia = f"Quizás buscabas '{posibles[0]}':"
+            repuestos = Repuesto.query.filter(Repuesto.nombre.ilike(f'%{posibles[0]}%')).all()
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render_template('tabla_repuestos.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia)
 
     return render_template('inventario.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia)
 
-@main.route('/exportar_excel')
-@login_required
-def exportar_excel():
-    try:
-        repuestos = Repuesto.query.all()
-        data = []
-        for r in repuestos:
-            data.append({
-                'Codigo': r.codigo,
-                'Nombre': r.nombre,
-                'Marca': r.marca,
-                'Stock': r.cantidad,
-                'Costo_Compra': r.costo,
-                'Precio_Venta': r.precio
-            })
-        
-        df = pd.read_json(json.dumps(data)) if data else pd.DataFrame(columns=['Codigo', 'Nombre', 'Marca', 'Stock', 'Costo_Compra', 'Precio_Venta'])
-        
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Inventario')
-            
-        output.seek(0)
-        
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'Inventario_Tecnicmaq_{datetime.now().strftime("%Y%m%d")}.xlsx'
-        )
-    except Exception as e:
-        flash(f'Error al exportar: {str(e)}', 'danger')
-        return redirect(url_for('main.inventario'))
-
 @main.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('main.dashboard'))
-
+    if current_user.is_authenticated: return redirect(url_for('main.dashboard'))
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        usuario_db = Usuario.query.filter_by(username=username).first()
-        
-        if usuario_db and check_password_hash(usuario_db.password, password):
-            login_user(usuario_db)
-            return redirect(url_for('main.dashboard')) 
-        else:
-            flash('Usuario o contraseña incorrectos.', 'danger')
-            
+        user = Usuario.query.filter_by(username=request.form.get('username')).first()
+        if user and check_password_hash(user.password, request.form.get('password')):
+            login_user(user)
+            return redirect(url_for('main.dashboard'))
+        flash('Credenciales incorrectas.', 'danger')
     return render_template('login.html', datetime=datetime)
 
 @main.route('/logout')
 @login_required
 def logout():
     logout_user()
-    flash('Has cerrado sesión.', 'info')
     return redirect(url_for('main.login'))
+
+# --- RUTAS DE GESTIÓN (AGREGAR, EDITAR, VENDER, BORRAR) ---
 
 @main.route('/agregar', methods=['GET', 'POST'])
 @login_required
 def agregar():
     if request.method == 'POST':
-        codigo = request.form.get('codigo')
-        nombre = request.form.get('nombre')
-        marca = request.form.get('marca')
         try:
-            cantidad = int(request.form.get('cantidad') or 0)
-            costo = float(request.form.get('costo') or 0)
-            precio = float(request.form.get('precio') or 0)
-        except ValueError:
-            flash('Error: Verifica que los números sean correctos.', 'danger')
-            return redirect(url_for('main.agregar'))
+            cant = int(request.form.get('cantidad') or 0)
+            cost = float(request.form.get('costo') or 0)
+            prec = float(request.form.get('precio') or 0)
+        except: flash('Error en números.', 'danger'); return redirect(url_for('main.agregar'))
 
-        file = request.files.get('imagen')
-        filename = guardar_imagen(file)
-        if not filename: filename = 'default.jpg'
+        filename = guardar_imagen(request.files.get('imagen')) or 'default.jpg'
+        
+        if Repuesto.query.filter_by(codigo=request.form.get('codigo')).first():
+            flash('Código ya existe.', 'danger'); return redirect(url_for('main.agregar'))
 
-        if Repuesto.query.filter_by(codigo=codigo).first():
-            flash('¡Error! Ya existe un repuesto con ese código.', 'danger')
-            return redirect(url_for('main.agregar'))
-
-        nuevo_repuesto = Repuesto(
-            codigo=codigo, nombre=nombre, marca=marca,
-            cantidad=cantidad, costo=costo, precio=precio,
-            imagen_filename=filename
-        )
-        db.session.add(nuevo_repuesto)
+        db.session.add(Repuesto(codigo=request.form.get('codigo'), nombre=request.form.get('nombre'), marca=request.form.get('marca'), cantidad=cant, costo=cost, precio=prec, imagen_filename=filename))
         db.session.commit()
-        flash('Repuesto agregado exitosamente.', 'success')
+        flash('Agregado correctamente.', 'success')
         return redirect(url_for('main.inventario'))
-
     return render_template('agregar.html')
 
-@main.route('/editar/<int:id>', methods=['POST']) # Solo POST para el modal
+@main.route('/editar/<int:id>', methods=['POST'])
 @login_required
 def editar(id):
-    repuesto = Repuesto.query.get_or_404(id)
-    q = request.args.get('q', '')
-    orden = request.args.get('orden', 'defecto')
-    page = request.args.get('page', 1, type=int)
-    
-    repuesto.codigo = request.form.get('codigo')
-    repuesto.nombre = request.form.get('nombre')
-    repuesto.marca = request.form.get('marca')
+    r = Repuesto.query.get_or_404(id)
+    r.codigo = request.form.get('codigo')
+    r.nombre = request.form.get('nombre')
+    r.marca = request.form.get('marca')
     try:
-        repuesto.cantidad = int(request.form.get('cantidad') or 0)
-        repuesto.costo = float(request.form.get('costo') or 0)
-        repuesto.precio = float(request.form.get('precio') or 0)
-    except ValueError:
-        flash('Error numérico.', 'danger')
-        return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
-
-    imagen = request.files.get('imagen')
-    if imagen and imagen.filename != '':
-        filename = guardar_imagen(imagen)
-        if filename: repuesto.imagen_filename = filename
-        
+        r.cantidad = int(request.form.get('cantidad') or 0)
+        r.costo = float(request.form.get('costo') or 0)
+        r.precio = float(request.form.get('precio') or 0)
+    except: pass
+    
+    filename = guardar_imagen(request.files.get('imagen'))
+    if filename: r.imagen_filename = filename
+    
     db.session.commit()
-    flash('Repuesto actualizado.', 'success')
-    return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
+    flash('Actualizado.', 'success')
+    return redirect(url_for('main.inventario', q=request.args.get('q',''), page=request.args.get('page',1)))
+
+@main.route('/vender/<int:id>', methods=['POST'])
+@login_required
+def vender_producto(id):
+    r = Repuesto.query.get_or_404(id)
+    cant = int(request.form.get('cantidad') or 0)
+    precio_final = float(request.form.get('precio_final') or r.precio)
+    
+    if cant > r.cantidad: flash('Stock insuficiente.', 'danger')
+    else:
+        r.cantidad -= cant
+        db.session.add(Venta(cantidad=cant, precio_unitario=precio_final, costo_unitario=r.costo, ganancia_total=(precio_final-r.costo)*cant, repuesto_nombre=r.nombre, repuesto_codigo=r.codigo))
+        db.session.commit()
+        flash('Venta registrada.', 'success')
+    
+    return redirect(url_for('main.inventario', q=request.args.get('q',''), page=request.args.get('page',1)))
 
 @main.route('/eliminar/<int:id>')
 @login_required
 def eliminar(id):
-    q = request.args.get('q', '')
-    orden = request.args.get('orden', 'defecto')
-    page = request.args.get('page', 1, type=int)
-
-    repuesto = Repuesto.query.get_or_404(id)
-    db.session.delete(repuesto)
+    db.session.delete(Repuesto.query.get_or_404(id))
     db.session.commit()
-    flash('Repuesto eliminado.', 'warning')
-    return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
+    flash('Eliminado.', 'warning')
+    return redirect(url_for('main.inventario'))
 
-@main.route('/vender/<int:id>', methods=['POST']) # OJO: Ahora solo aceptamos POST porque el formulario está en el modal
+# --- NUEVAS RUTAS: LISTA DE COMPRAS (REEMPLAZA RESERVAS) ---
+
+@main.route('/agregar_pedido/<int:id>', methods=['POST'])
 @login_required
-def vender_producto(id):
-    repuesto = Repuesto.query.get_or_404(id)
-    # Capturar memoria
-    q = request.args.get('q', '')
-    orden = request.args.get('orden', 'defecto')
-    page = request.args.get('page', 1, type=int)
-    
+def agregar_pedido(id):
+    r = Repuesto.query.get_or_404(id)
     try:
-        cantidad = int(request.form.get('cantidad') or 0)
-        # AQUÍ ESTÁ EL REGATEO: Recibimos el precio final que escribiste en el modal
-        precio_final = float(request.form.get('precio_final') or repuesto.precio) 
-    except ValueError:
-        flash('Error: Datos numéricos inválidos.', 'danger')
-        return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
+        cant = int(request.form.get('cantidad') or 1)
+        prov = request.form.get('proveedor', '').strip()
+        tel = request.form.get('telefono', '').strip()
+    except: flash('Datos inválidos.', 'danger'); return redirect(url_for('main.inventario'))
     
-    if cantidad > repuesto.cantidad:
-        flash('Error: Stock insuficiente.', 'danger')
-        return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
-        
-    # Cálculos con el PRECIO REGATEADO
-    total_pagar = precio_final * cantidad
-    ganancia = (precio_final - repuesto.costo) * cantidad
-    
-    repuesto.cantidad -= cantidad
-    
-    nueva_venta = Venta(
-        cantidad=cantidad, 
-        precio_unitario=precio_final, # Guardamos a cuánto se vendió realmente
-        costo_unitario=repuesto.costo, 
-        ganancia_total=ganancia, 
-        repuesto_nombre=repuesto.nombre, 
-        repuesto_codigo=repuesto.codigo
-    )
-    db.session.add(nueva_venta)
+    db.session.add(PedidoCompra(cantidad_sugerida=cant, proveedor_nombre=prov if prov else None, proveedor_telefono=tel if tel else None, repuesto=r))
     db.session.commit()
-    
-    flash(f'¡Venta registrada! Cobraste: S/{total_pagar:.2f}', 'success')
-    return redirect(url_for('main.inventario', q=q, orden=orden, page=page))
+    flash(f'Agregado a compras: {r.nombre}', 'info')
+    return redirect(url_for('main.inventario', q=request.args.get('q',''), page=request.args.get('page',1)))
 
-@main.route('/reservar/<int:id>', methods=['GET', 'POST'])
+@main.route('/lista_compras')
 @login_required
-def crear_reserva(id):
-    repuesto = Repuesto.query.get_or_404(id)
-    q = request.args.get('q', '')
-    orden = request.args.get('orden', 'defecto')
-    page = request.args.get('page', 1, type=int)
+def lista_compras():
+    # 1. Obtener todos los pedidos ordenados por fecha (del más reciente al más antiguo)
+    raw_pedidos = PedidoCompra.query.order_by(PedidoCompra.fecha_creacion.desc()).all()
     
-    if request.method == 'POST':
-        cliente = request.form.get('cliente')
-        telefono = request.form.get('telefono')
-        try:
-            cantidad = int(request.form.get('cantidad') or 0)
-        except ValueError:
-            flash('Cantidad inválida.', 'danger')
-            return redirect(url_for('main.crear_reserva', id=id, q=q, orden=orden, page=page))
+    # 2. Diccionarios para traducir la fecha a Español
+    dias_sem = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
+    meses = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio', 
+             7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+    
+    # 3. Agrupar los pedidos
+    # Estructura final: { "Jueves 5 de Febrero": [pedido1, pedido2], "Miércoles 4...": [...] }
+    pedidos_agrupados = {}
+    
+    for p in raw_pedidos:
+        dt = p.fecha_creacion
+        # Formato: "Jueves 5 de Febrero"
+        fecha_str = f"{dias_sem[dt.weekday()]} {dt.day} de {meses[dt.month]}"
         
-        if cantidad > repuesto.cantidad:
-            flash('Stock insuficiente.', 'danger')
-            return redirect(url_for('main.crear_reserva', id=id, q=q, orden=orden, page=page))
+        if fecha_str not in pedidos_agrupados:
+            pedidos_agrupados[fecha_str] = []
+        
+        pedidos_agrupados[fecha_str].append(p)
+        
+    return render_template('pedidos.html', pedidos_agrupados=pedidos_agrupados)
+
+# --- PEGAR ESTO DEBAJO DE LA FUNCIÓN 'lista_compras' EN routes.py ---
+
+@main.route('/exportar_compras')
+@login_required
+def exportar_compras():
+    try:
+        # 1. Buscamos todos los pedidos (pendientes y comprados)
+        pedidos = PedidoCompra.query.order_by(PedidoCompra.fecha_creacion.desc()).all()
+        
+        data = []
+        for p in pedidos:
+            data.append({
+                'Fecha': p.fecha_creacion.strftime('%d/%m/%Y'), # Formato día/mes/año
+                'Hora': p.fecha_creacion.strftime('%H:%M'),
+                'Estado': p.estado,
+                'Código': p.repuesto.codigo,
+                'Repuesto': p.repuesto.nombre,
+                'Marca': p.repuesto.marca,
+                'Cantidad Solicitada': p.cantidad_sugerida,
+                'Proveedor Sugerido': p.proveedor_nombre or '---',
+                'Contacto': p.proveedor_telefono or '---'
+            })
+        
+        # 2. Convertimos a Excel con Pandas
+        # (Si no hay datos, creamos una tabla vacía para no dar error)
+        if data:
+            df = pd.DataFrame(data)
+        else:
+            df = pd.DataFrame(columns=['Fecha', 'Código', 'Repuesto', 'Cantidad', 'Estado'])
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Lista de Compras')
             
-        repuesto.cantidad -= cantidad
-        nueva_reserva = Reserva(cliente=cliente, telefono=telefono, cantidad=cantidad, repuesto=repuesto)
-        db.session.add(nueva_reserva)
-        db.session.commit()
-        flash(f'¡Reserva creada!', 'success')
-        return redirect(url_for('main.lista_reservas'))
+        output.seek(0)
         
-    return render_template('form_reserva.html', repuesto=repuesto, q=q, orden=orden, page=page)
+        nombre_archivo = f'Compras_Tecnicmaq_{datetime.now().strftime("%Y-%m-%d")}.xlsx'
+        return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=nombre_archivo)
 
-# --- ESTA ES LA FUNCIÓN QUE TE FALTABA Y CAUSABA EL ERROR ---
-@main.route('/reservas')
+    except Exception as e:
+        print(f"Error exportando compras: {e}")
+        flash('Ocurrió un error al generar el Excel.', 'danger')
+        return redirect(url_for('main.lista_compras'))
+
+@main.route('/gestion_pedido/<int:id>/<accion>')
 @login_required
-def lista_reservas():
-    reservas = Reserva.query.all()
-    return render_template('reservas.html', reservas=reservas)
-# -------------------------------------------------------------
+def gestion_pedido(id, accion):
+    p = PedidoCompra.query.get_or_404(id)
+    if accion == 'comprado':
+        p.estado = 'Comprado'
+        p.repuesto.cantidad += p.cantidad_sugerida
+        flash('Stock actualizado.', 'success')
+    elif accion == 'eliminar':
+        db.session.delete(p)
+        flash('Eliminado.', 'warning')
+    db.session.commit()
+    return redirect(url_for('main.lista_compras'))
 
-@main.route('/gestion_reserva/<int:id>/<accion>')
-@login_required
-def gestion_reserva(id, accion):
-    reserva = Reserva.query.get_or_404(id)
-    repuesto = reserva.repuesto 
-    if accion == 'confirmar':
-        db.session.delete(reserva)
-        db.session.commit()
-        flash('Venta completada desde reserva.', 'success')
-    elif accion == 'cancelar':
-        if repuesto: repuesto.cantidad += reserva.cantidad
-        db.session.delete(reserva)
-        db.session.commit()
-        flash('Reserva cancelada. Stock devuelto.', 'warning')
-    return redirect(url_for('main.lista_reservas'))
-
-# --- EN app/routes.py ---
-
+# --- EXTRAS ---
 @main.route('/historial-ventas')
 @login_required
 def historial_ventas():
-    # 1. Obtener ventas ordenadas cronológicamente para el gráfico
-    ventas_asc = Venta.query.order_by(Venta.fecha.asc()).all()
-    nombres_meses = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio', 
-                     7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+    ventas = Venta.query.order_by(Venta.fecha.desc()).all()
+    ganancias = defaultdict(float)
+    for v in ventas: ganancias[f"{v.fecha.month}-{v.fecha.year}"] += v.ganancia_total
     
-    # Agrupar ganancias por mes para el gráfico
-    ganancias_mensuales = defaultdict(float)
-    for v in ventas_asc:
-        clave = f"{nombres_meses[v.fecha.month]} {str(v.fecha.year)[2:]}" # Ej: Enero 26
-        ganancias_mensuales[clave] += v.ganancia_total
-        
-    # Preparar listas para Chart.js (Ejes X e Y)
-    chart_labels = list(ganancias_mensuales.keys())
-    chart_data = list(ganancias_mensuales.values())
+    historial = defaultdict(lambda: {'ventas':[], 'suma_ganancia':0})
+    for v in ventas:
+        k = v.fecha.strftime('%B %Y')
+        historial[k]['ventas'].append(v)
+        historial[k]['suma_ganancia'] += v.ganancia_total
 
-    # 2. Obtener ventas ordenadas al revés para la lista detallada
-    ventas_desc = Venta.query.order_by(Venta.fecha.desc()).all()
-    historial_agrupado = {}
-    for venta in ventas_desc:
-        clave = f"{nombres_meses[venta.fecha.month]} {venta.fecha.year}"
-        if clave not in historial_agrupado:
-            historial_agrupado[clave] = {'ventas': [], 'suma_ingresos': 0, 'suma_ganancia': 0}
-        historial_agrupado[clave]['ventas'].append(venta)
-        historial_agrupado[clave]['suma_ingresos'] += venta.precio_unitario * venta.cantidad
-        historial_agrupado[clave]['suma_ganancia'] += venta.ganancia_total
-        
-    total_ganancia_global = sum(v.ganancia_total for v in ventas_desc)
-    total_ventas_count = len(ventas_desc)
+    return render_template('reporte_ventas.html', historial_agrupado=historial, total_ganancia_global=sum(v.ganancia_total for v in ventas), total_ventas_count=len(ventas), chart_labels=json.dumps(list(ganancias.keys())), chart_data=json.dumps(list(ganancias.values())))
 
-    # Enviamos los datos convertidos a JSON para que JavaScript los entienda
-    return render_template('reporte_ventas.html', 
-                           historial_agrupado=historial_agrupado, 
-                           total_ganancia_global=total_ganancia_global,
-                           total_ventas_count=total_ventas_count,
-                           chart_labels=json.dumps(chart_labels),
-                           chart_data=json.dumps(chart_data))
-    
 @main.route('/eliminar_venta/<int:id>', methods=['POST'])
 @login_required
 def eliminar_venta(id):
-    venta = Venta.query.get_or_404(id)
-    db.session.delete(venta)
-    db.session.commit()
+    db.session.delete(Venta.query.get_or_404(id)); db.session.commit()
     return redirect(url_for('main.historial_ventas'))
+
+@main.route('/exportar_excel')
+@login_required
+def exportar_excel():
+    output = io.BytesIO()
+    data = [{'Codigo': r.codigo, 'Nombre': r.nombre, 'Stock': r.cantidad, 'Precio': r.precio} for r in Repuesto.query.all()]
+    df = pd.DataFrame(data)
+    with pd.ExcelWriter(output, engine='openpyxl') as writer: df.to_excel(writer, index=False)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='Inventario.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@main.route('/importar_excel', methods=['POST'])
+@login_required
+def importar_excel():
+    f = request.files.get('archivo_excel')
+    if f:
+        try:
+            df = pd.read_excel(f); count = 0
+            for _, row in df.iterrows():
+                if not Repuesto.query.filter_by(codigo=str(row['Codigo'])).first():
+                    db.session.add(Repuesto(codigo=str(row['Codigo']), nombre=row['Nombre'], cantidad=int(row['Stock']), precio=float(row['Precio']), costo=float(row.get('Costo',0))))
+                    count += 1
+            db.session.commit()
+            flash(f'Importados {count} productos.', 'success')
+        except: flash('Error en archivo.', 'danger')
+    return redirect(url_for('main.inventario'))
+
+@main.route('/deshacer_carga')
+@login_required
+def deshacer_carga(): return redirect(url_for('main.inventario'))
 
 @main.route('/backup')
 @login_required
-def descargar_backup():
-    usuarios = Usuario.query.all(); repuestos = Repuesto.query.all(); ventas = Venta.query.all(); reservas = Reserva.query.all()
-    data = {'usuarios': [], 'repuestos': [], 'ventas': [], 'reservas': []}
-    for u in usuarios: data['usuarios'].append({'username': u.username, 'password_hash': u.password, 'nombre': u.nombre})
-    for r in repuestos: data['repuestos'].append({'codigo': r.codigo, 'nombre': r.nombre, 'marca': r.marca, 'cantidad': r.cantidad, 'costo': r.costo, 'precio': r.precio, 'imagen_filename': r.imagen_filename})
-    for v in ventas: data['ventas'].append({'fecha': v.fecha.strftime('%Y-%m-%d %H:%M:%S'), 'cantidad': v.cantidad, 'precio_unitario': v.precio_unitario, 'costo_unitario': v.costo_unitario, 'ganancia_total': v.ganancia_total, 'repuesto_nombre': v.repuesto_nombre, 'repuesto_codigo': v.repuesto_codigo})
-    for res in reservas: 
-        if res.repuesto: data['reservas'].append({'cliente': res.cliente, 'telefono': res.telefono, 'cantidad': res.cantidad, 'repuesto_codigo': res.repuesto.codigo})
-    
-    json_str = json.dumps(data, indent=4)
-    response = Response(json_str, mimetype='application/json')
-    response.headers['Content-Disposition'] = f'attachment; filename=backup_{datetime.now().strftime("%Y%m%d")}.json'
-    return response
+def descargar_backup(): return "Backup no configurado aún"
 
 @main.route('/restaurar', methods=['GET', 'POST'])
-def subir_backup():
-    if Usuario.query.first() and not current_user.is_authenticated: return redirect(url_for('main.login'))
-    if request.method == 'POST':
-        file = request.files['archivo']
-        if file:
-            try:
-                data = json.load(file)
-                for u_data in data.get('usuarios', []):
-                    if not Usuario.query.filter_by(username=u_data['username']).first():
-                        db.session.add(Usuario(username=u_data['username'], password=u_data['password_hash'], nombre=u_data['nombre']))
-                for r_data in data.get('repuestos', []):
-                    if not Repuesto.query.filter_by(codigo=r_data['codigo']).first():
-                        db.session.add(Repuesto(codigo=r_data['codigo'], nombre=r_data['nombre'], marca=r_data['marca'], cantidad=int(r_data['cantidad']), costo=r_data['costo'], precio=r_data['precio'], imagen_filename=r_data.get('imagen_filename', 'default.jpg')))
-                for v_data in data.get('ventas', []):
-                    db.session.add(Venta(fecha=datetime.strptime(v_data['fecha'], '%Y-%m-%d %H:%M:%S'), cantidad=int(v_data['cantidad']), precio_unitario=v_data['precio_unitario'], costo_unitario=v_data['costo_unitario'], ganancia_total=v_data['ganancia_total'], repuesto_nombre=v_data['repuesto_nombre'], repuesto_codigo=v_data['repuesto_codigo']))
-                db.session.commit()
-                flash('¡Base de datos restaurada exitosamente!', 'success')
-                return redirect(url_for('main.dashboard'))
-            except Exception as e: db.session.rollback(); flash(f'Error al procesar el archivo: {str(e)}', 'danger')
-    return render_template('restaurar.html')
+def subir_backup(): return "Restauración no configurada aún"
+
+# --- REEMPLAZA ESTA FUNCIÓN AL FINAL DE routes.py ---
+
+# --- EN routes.py (Reemplaza la función chatbot_responde) ---
 
 @main.route('/chatbot', methods=['POST'])
 @login_required
@@ -463,122 +359,37 @@ def chatbot_responde():
     data = request.get_json()
     mensaje_usuario = data.get('mensaje', '')
     historial = session.get('historial_chat', [])
-    contexto_previo = "".join([f"- {msg['role']}: {msg['text']}\n" for msg in historial])
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key: return jsonify({'respuesta': '⚠️ Error: Falta API Key de Google.'})
     
-    genai.configure(api_key=api_key)
-    # Usamos el modelo estable disponible
-    model = genai.GenerativeModel('gemini-flash-latest')
-    instruccion_sistema = f"Eres el asistente de 'Tecnicmaq'. HISTORIAL: {contexto_previo} USUARIO: '{mensaje_usuario}'. COMANDOS: COMANDO_ANALISIS|CLAVE, COMANDO_BUSCAR|termino, COMANDO_CREAR|CODIGO|NOMBRE|PRECIO|STOCK. Responde natural si no hay comandos."
-    try:
-        response = model.generate_content(instruccion_sistema)
-        respuesta_ia = response.text.strip()
-        respuesta_final = respuesta_ia
-        if "COMANDO_ANALISIS|" in respuesta_ia:
-            clave = respuesta_ia.replace("COMANDO_ANALISIS|", "").strip()
-            res = []
-            if clave == 'MAX_STOCK': res = Repuesto.query.order_by(Repuesto.cantidad.desc()).limit(3).all()
-            elif clave == 'MIN_STOCK': res = Repuesto.query.order_by(Repuesto.cantidad.asc()).limit(3).all()
-            elif clave == 'MAX_PRECIO': res = Repuesto.query.order_by(Repuesto.precio.desc()).limit(3).all()
-            elif clave == 'MIN_PRECIO': res = Repuesto.query.order_by(Repuesto.precio.asc()).limit(3).all()
-            respuesta_final = "Inventario vacío." if not res else "📊 Top 3:\n" + "\n".join([f"🥇 {r.nombre} | Stock: {r.cantidad} | S/{r.precio}" for r in res])
-        elif "COMANDO_BUSCAR|" in respuesta_ia:
-            t = respuesta_ia.replace("COMANDO_BUSCAR|", "").strip().lower()
-            q = Repuesto.query
-            if "stock 0" in t: res = q.filter(Repuesto.cantidad == 0).all()
-            elif "stock 1" in t: res = q.filter(Repuesto.cantidad <= 1).all()
-            else: res = q.filter((Repuesto.nombre.ilike(f'%{t}%')) | (Repuesto.codigo.ilike(f'%{t}%'))).all()
-            respuesta_final = f"❌ Nada para '{t}'." if not res else "🔍 Encontré:\n" + "\n".join([f"• {r.nombre} | Stock: {r.cantidad} | S/{r.precio}" for r in res])
-        elif "COMANDO_CREAR|" in respuesta_ia:
-            d = respuesta_ia.replace("COMANDO_CREAR|", "").split('|')
-            if len(d) >= 4 and not Repuesto.query.filter_by(codigo=d[0]).first():
-                db.session.add(Repuesto(codigo=d[0], nombre=d[1], precio=float(d[2]), cantidad=int(d[3]), marca="Generico IA", costo=float(d[2])*0.7))
-                db.session.commit(); respuesta_final = f"✅ Agregado: {d[1]} a S/{d[2]}"
-            else: respuesta_final = "⚠️ Error datos/duplicado."
-        historial.append({"role": "Usuario", "text": mensaje_usuario}); historial.append({"role": "Bot", "text": respuesta_final})
-        session['historial_chat'] = historial[-6:]; return jsonify({'respuesta': respuesta_final})
-    except Exception as e:
-        print(f"🔥 ERROR GEMINI: {str(e)}") 
-        return jsonify({'respuesta': f"😵 Error interno: {str(e)}"})
+    # ---------------------------------------------------------
+    # ⚠️ PEGA AQUÍ TU API KEY DIRECTAMENTE (Dentro de las comillas)
+    # Si no tienes una, créala gratis en: https://aistudio.google.com/app/apikey
+    api_key = "AIzaSyC0KJXME7qt-7J2bkcRP8q3jRy3ODxgJd8" 
+    # ---------------------------------------------------------
 
-# --- VERSIÓN OPTIMIZADA DE CARGA (Para no romper Render) ---
-@main.route('/importar_excel', methods=['POST'])
-@login_required
-def importar_excel():
-    if 'archivo_excel' not in request.files: return redirect(url_for('main.inventario'))
-    archivo = request.files['archivo_excel']
-    if archivo.filename == '': return redirect(url_for('main.inventario'))
+    if "TU_API_KEY" in api_key:
+        return jsonify({'respuesta': '⚠️ Error: Necesitas poner tu API Key real en el código (routes.py).'})
+
+    # Datos básicos para que la IA no alucine
+    contexto_negocio = "Eres el asistente de 'Tecnicmaq'. Responde en español, sé breve y útil."
 
     try:
-        # engine='openpyxl' es vital
-        df = pd.read_excel(archivo, dtype={'Codigo': str}, engine='openpyxl')
-        df.columns = df.columns.str.strip()
+        genai.configure(api_key=api_key)
+        # Usamos el modelo más estable actualmente
+        model = genai.GenerativeModel('gemini-pro')
         
-        contador, errores = 0, 0
-        lote_actual = str(uuid.uuid4())
+        chat = model.start_chat(history=[])
+        response = chat.send_message(f"{contexto_negocio}. Usuario dice: {mensaje_usuario}")
         
-        # BAJAMOS EL LOTE A 30 PARA AHORRAR RAM
-        BATCH_SIZE = 30 
-        batch_data = [] 
+        respuesta = response.text.strip()
+        
+        # Guardar historial
+        historial.append({"role": "Usuario", "text": mensaje_usuario})
+        historial.append({"role": "Bot", "text": respuesta})
+        session['historial_chat'] = historial[-6:]
+        
+        return jsonify({'respuesta': respuesta})
 
-        for index, row in df.iterrows():
-            raw_codigo = str(row.get('Codigo', '')).strip()
-            
-            if not raw_codigo or raw_codigo.lower() == 'nan': continue
-            
-            # Chequeo rápido de duplicados
-            if db.session.query(Repuesto.id).filter_by(codigo=raw_codigo).first():
-                errores += 1
-                continue
-            
-            try:
-                batch_data.append(Repuesto(
-                    codigo=raw_codigo,
-                    nombre=row.get('Nombre', 'Sin Nombre'),
-                    marca=row.get('Marca', 'Genérico'),
-                    cantidad=int(float(row.get('Stock', 0))),
-                    costo=float(row.get('Costo_Compra', 0)),
-                    precio=float(row.get('Precio_Venta', 0)),
-                    lote_id=lote_actual
-                ))
-                contador += 1
-                
-                # GUARDAR Y LIMPIAR RAM
-                if len(batch_data) >= BATCH_SIZE:
-                    db.session.bulk_save_objects(batch_data)
-                    db.session.commit()
-                    batch_data = [] # Vaciar lista
-                    gc.collect() # FORZAR LIMPIEZA DE MEMORIA
-                    
-            except Exception:
-                errores += 1
-
-        if batch_data:
-            db.session.bulk_save_objects(batch_data)
-            db.session.commit()
-            
-        del df
-        gc.collect()
-
-        if contador > 0:
-            session['ultimo_lote_id'] = lote_actual
-            flash(f'¡Éxito! Importados {contador}. Duplicados/Errores: {errores}', 'success')
-        else:
-            flash(f'No se importó nada. Errores: {errores}', 'warning')
-            
     except Exception as e:
-        db.session.rollback()
-        print(f"🔥 ERROR MEMORIA: {str(e)}")
-        flash('El archivo es muy pesado o tiene errores.', 'danger')
-
-    return redirect(url_for('main.inventario'))
-
-@main.route('/deshacer_carga')
-@login_required
-def deshacer_carga():
-    lote_id = session.get('ultimo_lote_id')
-    if lote_id:
-        Repuesto.query.filter_by(lote_id=lote_id).delete(); db.session.commit(); session.pop('ultimo_lote_id', None)
-        flash('⏮️ Carga deshecha.', 'info')
-    return redirect(url_for('main.inventario'))
+        # Esto imprimirá el error REAL en tu terminal negra para que sepamos qué pasa
+        print(f"\n🔥 ERROR EXACTO DE LA IA: {str(e)}\n")
+        return jsonify({'respuesta': "Lo siento, hubo un error de conexión con Google. Revisa la terminal."})

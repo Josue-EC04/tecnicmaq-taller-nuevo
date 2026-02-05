@@ -1,3 +1,78 @@
+<style>
+    @media (max-width: 768px) {
+        /* Ocultar encabezados de tabla clásica */
+        .table-modern thead { display: none; }
+        
+        /* Convertir filas en tarjetas */
+        .table-modern tr { 
+            display: block; 
+            margin-bottom: 1.5rem; 
+            border-radius: 16px; 
+            background: #ffffff; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            border: 1px solid #f0f0f0; 
+            overflow: hidden; 
+        }
+        
+        /* Convertir celdas en filas dentro de la tarjeta */
+        .table-modern td { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 1rem 1.2rem; 
+            text-align: right; 
+            border-bottom: 1px solid #f8f9fa; 
+        }
+        
+        /* Etiquetas automáticas (Stock, Costo, etc.) */
+        .table-modern td::before { 
+            content: attr(data-label); 
+            font-weight: 700; 
+            color: #adb5bd; 
+            font-size: 0.75rem; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+        }
+
+        /* DISEÑO ESPECIAL: PRIMERA CELDA (FOTO Y NOMBRE) */
+        .table-modern td:first-child { 
+            display: block; 
+            text-align: center; 
+            background: #f8f9fa; 
+            padding: 1.5rem; 
+        }
+        .table-modern td:first-child::before { display: none; } /* Sin etiqueta */
+        .table-modern td:first-child .d-flex { 
+            flex-direction: column; 
+            align-items: center; 
+        }
+        .table-modern td:first-child .img-zoom { 
+            width: 100px; 
+            height: 100px; 
+            margin-right: 0 !important; 
+            margin-bottom: 1rem; 
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .table-modern td:first-child .fw-bold { font-size: 1.1rem; margin-bottom: 5px; }
+
+        /* DISEÑO ESPECIAL: ÚLTIMA CELDA (BOTONES) */
+        .table-modern td:last-child { 
+            display: block; 
+            padding: 1rem; 
+            background: #fff; 
+            border-bottom: none;
+        }
+        .table-modern td:last-child::before { display: none; }
+        .table-modern td:last-child .btn-group { 
+            display: flex; 
+            gap: 8px; 
+            width: 100%; 
+        }
+        .table-modern td:last-child .btn { flex: 1; } /* Botones anchos */
+    }
+</style>
+
 <div class="card-body p-0">
     <div class="table-responsive">
         <table class="table table-modern mb-0 w-100">
@@ -24,7 +99,8 @@
                             </div>
                         </div>
                     </td>
-                    <td class="text-center align-middle">
+
+                    <td class="text-center align-middle" data-label="Stock">
                         {% if r.cantidad <= 2 %}
                             <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-2 border border-danger border-opacity-25">Crítico: {{ r.cantidad }}</span>
                         {% elif r.cantidad < 5 %}
@@ -33,31 +109,42 @@
                             <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 border border-success border-opacity-25">{{ r.cantidad }} uds.</span>
                         {% endif %}
                     </td>
-                    <td class="text-muted align-middle" style="font-family: monospace;">S/{{ "%.2f"|format(r.costo or 0) }}</td>
-                    <td class="fw-bold text-success fs-6 align-middle" style="font-family: monospace;">S/{{ "%.2f"|format(r.precio or 0) }}</td>
-                    <td class="align-middle">
+
+                    <td class="text-muted align-middle" style="font-family: monospace;" data-label="Costo">S/{{ "%.2f"|format(r.costo or 0) }}</td>
+                    <td class="fw-bold text-success fs-6 align-middle" style="font-family: monospace;" data-label="Precio Venta">S/{{ "%.2f"|format(r.precio or 0) }}</td>
+                    <td class="align-middle" data-label="Margen">
                         <span class="badge bg-light text-dark border fw-normal text-muted">+ S/{{ "%.2f"|format((r.precio or 0) - (r.costo or 0)) }}</span>
                     </td>
+
                     <td class="text-end pe-4 align-middle">
                         <div class="btn-group">
                             {% if r.cantidad > 0 %}
                                 <button type="button" class="btn btn-sm btn-success fw-bold px-3 d-flex align-items-center gap-1 shadow-sm" 
                                         data-bs-toggle="modal" data-bs-target="#modalVenta"
                                         data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-precio="{{ r.precio or 0 }}" data-stock="{{ r.cantidad or 0 }}">
-                                    <i class="bi bi-cash"></i> Vender
+                                    <i class="bi bi-cash"></i> <span class="d-none d-md-inline ms-1">Vender</span>
                                 </button>
-                                <a href="{{ url_for('main.crear_reserva', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-warning shadow-sm" title="Reservar"><i class="bi bi-clock-history"></i></a>
                             {% else %}
                                 <button class="btn btn-sm btn-light text-muted border" disabled>Agotado</button>
                             {% endif %}
-                            <button type="button" class="btn btn-sm btn-white border text-primary ms-1"
+                            
+                            <button type="button" class="btn btn-sm btn-info text-white shadow-sm" 
+                                    data-bs-toggle="modal" data-bs-target="#modalPedido"
+                                    data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-codigo="{{ r.codigo }}">
+                                <i class="bi bi-cart-plus-fill"></i>
+                            </button>
+                            
+                            <button type="button" class="btn btn-sm btn-white border text-primary"
                                     data-bs-toggle="modal" data-bs-target="#modalEditar"
                                     data-id="{{ r.id }}" data-codigo="{{ r.codigo or '' }}" data-nombre="{{ r.nombre or '' }}"
                                     data-marca="{{ r.marca or '' }}" data-cantidad="{{ r.cantidad or 0 }}"
                                     data-costo="{{ r.costo or 0 }}" data-precio="{{ r.precio or 0 }}" title="Editar">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <a href="{{ url_for('main.eliminar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-white border text-danger" onclick="return confirm('¿Eliminar definitivamente?');" title="Eliminar"><i class="bi bi-trash"></i></a>
+                            
+                            <a href="{{ url_for('main.eliminar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-white border text-danger" onclick="return confirm('¿Eliminar definitivamente?');" title="Eliminar">
+                                <i class="bi bi-trash"></i>
+                            </a>
                         </div>
                     </td>
                 </tr>
@@ -76,9 +163,7 @@
                 <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
             </li>
             <li class="page-item disabled">
-                <span class="page-link border-0 fw-bold bg-transparent text-muted">
-                    Pág {{ pagination.page }} de {{ pagination.pages }} 
-                </span>
+                <span class="page-link border-0 fw-bold bg-transparent text-muted">Pág {{ pagination.page }} de {{ pagination.pages }}</span>
             </li>
             <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
                 <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>

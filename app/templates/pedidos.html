@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white p-4 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center shadow-sm p-3" style="width: 60px; height: 60px;">
+            <i class="bi bi-basket2-fill fs-2"></i>
+        </div>
+        <div>
+            <h3 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                Lista de Compras
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" height="35" class="d-none d-md-inline ms-2">
+            </h3>
+            <p class="text-muted mb-0">Gestión de reaprovisionamiento agrupado por día.</p>
+        </div>
+    </div>
+    
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.exportar_compras') }}" class="btn btn-success rounded-pill shadow-sm fw-bold">
+            <i class="bi bi-file-earmark-excel me-2"></i> Excel
+        </a>
+        <button class="btn btn-outline-dark rounded-pill shadow-sm fw-bold" onclick="window.print()">
+            <i class="bi bi-printer me-2"></i> Imprimir
+        </button>
+    </div>
+</div>
+
+{% for fecha, lista_pedidos in pedidos_agrupados.items() %}
+
+    <div class="d-flex align-items-center mb-3 mt-4">
+        <div class="bg-dark text-white px-4 py-2 rounded-pill shadow-sm fw-bold d-flex align-items-center gap-2" style="font-size: 1.1rem; border: 2px solid #212529;">
+            <i class="bi bi-calendar-event"></i> {{ fecha }}
+        </div>
+        <div class="flex-grow-1 ms-3 border-bottom border-2 border-dark opacity-25"></div>
+    </div>
+
+    <div class="row g-3 mb-2">
+        {% for p in lista_pedidos %}
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 {{ 'opacity-50' if p.estado == 'Comprado' else '' }}" style="transition: transform 0.2s;">
+                <div class="card-body p-0 d-flex flex-column flex-sm-row">
+                    
+                    <div class="p-3 d-flex align-items-center gap-3 flex-grow-1">
+                        <img src="{{ url_for('static', filename='uploads/' + p.repuesto.imagen_filename) }}" class="rounded-3 border shadow-sm" width="80" height="80" style="object-fit: cover;">
+                        <div>
+                            {% if p.estado == 'Comprado' %}
+                                <span class="badge bg-success mb-1"><i class="bi bi-check2"></i> COMPRADO</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark mb-1">PENDIENTE</span>
+                            {% endif %}
+                            
+                            <h6 class="fw-bold mb-0 text-dark fs-5">{{ p.repuesto.nombre }}</h6>
+                            <div class="d-flex align-items-center gap-2 text-muted small">
+                                <span class="badge bg-light text-dark border">{{ p.repuesto.codigo }}</span>
+                                <span>{{ p.repuesto.marca }}</span>
+                            </div>
+
+                            {% if p.proveedor_nombre %}
+                            <div class="mt-2 p-2 bg-light rounded border border-dashed small d-inline-block">
+                                <i class="bi bi-shop text-primary"></i> <strong>{{ p.proveedor_nombre }}</strong>
+                                {% if p.proveedor_telefono %} <span class="mx-1">|</span> <i class="bi bi-whatsapp text-success"></i> {{ p.proveedor_telefono }} {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light border-start d-flex flex-column justify-content-center gap-2" style="min-width: 210px; border-top-right-radius: 1rem; border-bottom-right-radius: 1rem;">
+                        
+                        <div class="text-center mb-1">
+                            <small class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">Solicitar</small>
+                            <div class="fs-3 fw-bold text-dark lh-1">{{ p.cantidad_sugerida }} <small class="fs-6 fw-normal">uds.</small></div>
+                        </div>
+
+                        {% if p.estado != 'Comprado' %}
+                        <div class="dropdown w-100">
+                            <button class="btn btn-white border w-100 btn-sm dropdown-toggle shadow-sm fw-bold" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-search"></i> Buscar Precios
+                            </button>
+                            <ul class="dropdown-menu border-0 shadow p-2" style="z-index: 1050;">
+                                <li><h6 class="dropdown-header small text-muted">Comparar en:</h6></li>
+                                <li><a class="dropdown-item rounded-2" href="https://www.google.com/search?tbm=shop&q={{ p.repuesto.nombre }} repuesto peru" target="_blank"><i class="bi bi-google text-primary me-2"></i> Google Shopping</a></li>
+                                <li><a class="dropdown-item rounded-2" href="https://listado.mercadolibre.com.pe/{{ p.repuesto.nombre }}" target="_blank"><i class="bi bi-bag-fill text-warning me-2"></i> MercadoLibre</a></li>
+                                <li><a class="dropdown-item rounded-2" href="https://www.aliexpress.com/wholesale?SearchText={{ p.repuesto.nombre }}" target="_blank"><i class="bi bi-bag-check-fill text-danger me-2"></i> AliExpress</a></li>
+                            </ul>
+                        </div>
+
+                        <a href="{{ url_for('main.gestion_pedido', id=p.id, accion='comprado') }}" class="btn btn-success btn-sm fw-bold w-100 shadow-sm" onclick="return confirm('¿Confirmar compra? Se sumará al stock.');">
+                            <i class="bi bi-check-lg"></i> Ya lo compré
+                        </a>
+                        {% endif %}
+                        
+                        <a href="{{ url_for('main.gestion_pedido', id=p.id, accion='eliminar') }}" class="btn btn-sm text-danger w-100 text-decoration-none opacity-75 hover-opacity-100">
+                            <i class="bi bi-trash"></i> Eliminar de lista
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+{% else %}
+    <div class="text-center py-5">
+        <div class="mb-3">
+            <div class="bg-light rounded-circle d-inline-flex p-4">
+                <i class="bi bi-cart-check display-1 text-muted opacity-25"></i>
+            </div>
+        </div>
+        <h3 class="fw-bold text-dark">Todo está al día</h3>
+        <p class="text-muted">No tienes pedidos pendientes en tu lista de compras.</p>
+        <a href="{{ url_for('main.inventario') }}" class="btn btn-primary rounded-pill px-4 fw-bold">Ir al Inventario</a>
+    </div>
+{% endfor %}
+
+<style>
+    /* Efecto Hover sutil en las tarjetas */
+    .hover-opacity-100:hover { opacity: 1 !important; text-decoration: underline !important; }
+</style>
+{% endblock %}  
