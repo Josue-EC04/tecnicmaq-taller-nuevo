@@ -66,12 +66,16 @@ def dashboard():
                            ingreso_hoy_total=ingreso_hoy_total, ventas_hoy_count=ventas_hoy_count,
                            top_ventas=top_ventas, datetime=datetime)
 
+# --- REEMPLAZA ESTA FUNCIÓN EN routes.py ---
+
 @main.route('/inventario')
 @login_required
 def inventario():
     page = request.args.get('page', 1, type=int)
     busqueda = request.args.get('q', '').strip()
-    orden = request.args.get('orden', 'defecto')
+    
+    # 1. CAMBIO AQUÍ: Ahora el orden por defecto es 'nombre_asc' (A - Z)
+    orden = request.args.get('orden', 'nombre_asc')
     
     query = Repuesto.query
     mensaje_sugerencia = None 
@@ -81,12 +85,14 @@ def inventario():
         for termino in terminos:
             query = query.filter((Repuesto.nombre.ilike(f'%{termino}%')) | (Repuesto.codigo.ilike(f'%{termino}%')) | (Repuesto.marca.ilike(f'%{termino}%')))
     
+    # Ordenamiento
     if orden == 'nombre_asc': query = query.order_by(Repuesto.nombre.asc())
     elif orden == 'nombre_desc': query = query.order_by(Repuesto.nombre.desc())
     elif orden == 'precio_alto': query = query.order_by(Repuesto.precio.desc())
     elif orden == 'precio_bajo': query = query.order_by(Repuesto.precio.asc())
     elif orden == 'stock_bajo': query = query.order_by(Repuesto.cantidad.asc())
-    else: query = query.order_by(Repuesto.id.desc())
+    elif orden == 'defecto': query = query.order_by(Repuesto.id.desc())
+    else: query = query.order_by(Repuesto.nombre.asc()) # Por si acaso
 
     pagination = query.paginate(page=page, per_page=20, error_out=False)
     repuestos = pagination.items

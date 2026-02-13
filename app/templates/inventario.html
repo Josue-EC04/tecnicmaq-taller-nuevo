@@ -3,9 +3,9 @@
 {% block content %}
 <style>
     /* Estilos de Zoom y Barra */
-    .img-zoom { width: 50px; height: 50px; object-fit: cover; transition: transform 0.2s ease; cursor: pointer; border-radius: 10px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); }
-    .img-zoom:hover { transform: scale(4); z-index: 1000; border: 3px solid white; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); position: relative; }
-    .header-bar { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); }
+    .img-zoom { width: 50px; height: 50px; object-fit: cover; transition: transform 0.2s ease; cursor: pointer; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .img-zoom:hover { transform: scale(4); z-index: 1000; border: 3px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; }
+    .header-bar { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
     .btn-pill { border-radius: 50px; padding-left: 1.5rem; padding-right: 1.5rem; }
     .input-excel { max-width: 220px; border-radius: 8px 0 0 8px !important; border-color: #dee2e6; }
     .btn-upload { border-radius: 0 8px 8px 0 !important; }
@@ -13,16 +13,11 @@
     /* Buscador Cápsula */
     .search-capsule { transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); border: 2px solid transparent; }
     .search-capsule:focus-within { border-color: #86b7fe; box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15) !important; transform: translateY(-2px); }
-    .search-capsule:hover { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important; }
+    .search-capsule:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important; }
     .input-clean { outline: none; box-shadow: none !important; }
     .input-clean::placeholder { color: #adb5bd; font-weight: 400; }
     
-    /* Tabla y Utilidades */
-    .table-modern { border-collapse: separate; border-spacing: 0; }
-    .table-modern thead th { background-color: #f8f9fa; color: #6c757d; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px; padding: 1.2rem 1rem; border-bottom: 2px solid #e9ecef; }
-    .table-modern tbody td { padding: 1rem 1rem; vertical-align: middle; border-bottom: 1px solid #f1f3f5; background-color: white; transition: background-color 0.2s; }
-    .table-modern tbody tr:hover td { background-color: #fcfcfc; }
-    .table-modern tbody tr:last-child td { border-bottom: none; }
+    /* Utilidades */
     .table-responsive { overflow: visible !important; border-radius: 16px; }
 </style>
 
@@ -38,7 +33,7 @@
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-outline-secondary btn-sm shadow-sm" title="Descargar Reporte"><i class="bi bi-download"></i> <span class="d-none d-md-inline">Reporte</span></a>
-        <div class="vr mx-1 text-muted"></div>
+        <div class="vr mx-1 text-muted"></div> 
         <form action="{{ url_for('main.importar_excel') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center">
             <div class="input-group input-group-sm shadow-sm">
                 <input type="file" name="archivo_excel" class="form-control input-excel" accept=".xlsx, .xls" required>
@@ -46,7 +41,7 @@
             </div>
         </form>
         {% if session.get('ultimo_lote_id') %}
-        <a href="{{ url_for('main.deshacer_carga') }}" class="btn btn-danger btn-sm shadow-sm animate-pulse rounded-3 ms-2"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</a>
+            <a href="{{ url_for('main.deshacer_carga') }}" class="btn btn-danger btn-sm shadow-sm animate-pulse rounded-3 ms-2"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</a>
         {% endif %}
         <a href="/agregar" class="btn btn-success shadow btn-pill fw-bold ms-2"><i class="bi bi-plus-lg"></i> Nuevo</a>
     </div>
@@ -70,14 +65,15 @@
                                 {% elif orden_actual == 'precio_alto' %}Mayor Precio
                                 {% elif orden_actual == 'precio_bajo' %}Menor Precio
                                 {% elif orden_actual == 'stock_bajo' %}Menor Stock
-                                {% else %}Recientes{% endif %}
+                                {% elif orden_actual == 'defecto' %}Recientes
+                                {% else %}A - Z{% endif %}
                             </span>
                         </div>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-4 p-2 mt-2" style="min-width: 200px;">
                         <li><h6 class="dropdown-header small text-uppercase fw-bold text-muted ps-3">Criterio de Orden</h6></li>
-                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('defecto', 'Recientes')"><i class="bi bi-clock-history"></i> Recientes</button></li>
                         <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('nombre_asc', 'Nombre (A-Z)')"><i class="bi bi-sort-alpha-down"></i> Nombre (A-Z)</button></li>
+                        <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('defecto', 'Recientes')"><i class="bi bi-clock-history"></i> Recientes</button></li>
                         <li><button class="dropdown-item rounded-3 mb-1 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('precio_bajo', 'Precio Bajo')"><i class="bi bi-piggy-bank"></i> Precio Bajo</button></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><button class="dropdown-item rounded-3 d-flex align-items-center gap-2" type="button" onclick="cambiarOrden('stock_bajo', 'Stock Crítico')"><i class="bi bi-exclamation-triangle text-warning"></i> Stock Crítico</button></li>
@@ -96,7 +92,7 @@
     // Variables globales de estado
     let estadoActual = { q: "{{ busqueda }}", orden: "{{ orden_actual }}", page: 1 };
 
-    // Función MAESTRA para cargar datos sin ensuciar historial
+    // --- FUNCIÓN CENTRAL: Cargar datos sin recargar página ---
     function cargarInventario(params) {
         estadoActual = { ...estadoActual, ...params };
         const url = new URL(window.location.origin + "/inventario");
@@ -105,33 +101,33 @@
         url.searchParams.set('page', estadoActual.page);
 
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(response => response.text())
-            .then(html => {
-                document.getElementById('contenedor-inventario').innerHTML = html;
-                window.history.replaceState({}, '', url);
-                conectarPaginacionAjax();
-            })
-            .catch(error => console.error('Error cargando inventario:', error));
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('contenedor-inventario').innerHTML = html;
+            window.history.replaceState({}, '', url); 
+            conectarPaginacionAjax();
+        })
+        .catch(error => console.error('Error cargando inventario:', error));
     }
 
-    // Búsqueda en vivo
+    // --- BÚSQUEDA ---
     let timeout = null;
     const input = document.getElementById('inputBusqueda');
     const btnLimpiar = document.getElementById('btnLimpiar');
 
-    input.addEventListener('input', function () {
+    input.addEventListener('input', function() {
         clearTimeout(timeout);
         btnLimpiar.style.display = input.value ? 'flex' : 'none';
         timeout = setTimeout(() => { cargarInventario({ q: input.value, page: 1 }); }, 300);
     });
 
-    btnLimpiar.addEventListener('click', function () {
+    btnLimpiar.addEventListener('click', function() {
         input.value = '';
         btnLimpiar.style.display = 'none';
         cargarInventario({ q: '', page: 1 });
     });
 
-    window.cambiarOrden = function (nuevoOrden, textoOrden) {
+    window.cambiarOrden = function(nuevoOrden, textoOrden) {
         document.getElementById('textoOrdenActual').innerText = textoOrden;
         cargarInventario({ orden: nuevoOrden, page: 1 });
     };
@@ -139,7 +135,7 @@
     function conectarPaginacionAjax() {
         const links = document.querySelectorAll('.page-link');
         links.forEach(link => {
-            link.addEventListener('click', function (e) {
+            link.addEventListener('click', function(e) {
                 e.preventDefault(); 
                 const href = this.getAttribute('href');
                 if (href && href !== '#') {
@@ -151,52 +147,114 @@
         });
     }
 
-    // Inicialización
-    document.addEventListener('DOMContentLoaded', function () {
-        conectarPaginacionAjax();
+    // --- CORRECCIÓN: GESTIÓN DE FORMULARIOS BLINDADA CONTRA CONFLICTOS ---
+    function conectarFormularios() {
+        // Le decimos exactamente qué texto lleva cada botón para que no se confunda
+        const formsConfig = [
+            { id: 'formVenta', texto: 'Confirmar Venta' },
+            { id: 'formEditar', texto: 'Guardar Cambios' },
+            { id: 'formPedido', texto: 'Agregar a Lista' }
+        ];
 
-        // --- MODAL VENTA ---
+        formsConfig.forEach(config => {
+            const form = document.getElementById(config.id);
+            if (form) {
+                const newForm = form.cloneNode(true);
+                form.parentNode.replaceChild(newForm, form);
+                
+                newForm.addEventListener('submit', function(e) {
+                    e.preventDefault(); 
+                    e.stopImmediatePropagation(); // <-- ¡Esto evita que base.html interfiera!
+                    
+                    const formData = new FormData(this);
+                    const action = this.action;
+                    const btn = this.querySelector('button[type="submit"]');
+                    
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
+
+                    fetch(action, { method: 'POST', body: formData })
+                    .then(response => {
+                        if (response.ok) {
+                            try {
+                                const modalElement = this.closest('.modal');
+                                let modalInstance = bootstrap.Modal.getInstance(modalElement);
+                                if (modalInstance) modalInstance.hide();
+                                
+                                setTimeout(() => {
+                                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                                    document.body.classList.remove('modal-open');
+                                    document.body.style = '';
+                                }, 300);
+                            } catch(err) { console.error("Error modal:", err); }
+
+                            cargarInventario({});
+                            this.reset();
+                        } else {
+                            alert("Hubo un error al guardar los datos.");
+                        }
+                    })
+                    .catch(err => alert("Error de conexión."))
+                    .finally(() => {
+                        // SIEMPRE restaura el texto correcto exacto
+                        btn.disabled = false;
+                        btn.innerHTML = config.texto;
+                    });
+                });
+            }
+        });
+        reactivarCalculadora();
+    }
+
+    function reactivarCalculadora() {
+        const inpCant = document.getElementById('ventaCantidadInput');
+        const inpPrec = document.getElementById('ventaPrecioInput');
+        const dispTot = document.getElementById('ventaTotalDisplay');
+        
+        function actualizarTotal() {
+            if(inpCant && inpPrec && dispTot) {
+                const c = parseFloat(inpCant.value) || 0;
+                const p = parseFloat(inpPrec.value) || 0;
+                dispTot.textContent = (c * p).toFixed(2);
+            }
+        }
+        if(inpCant) inpCant.addEventListener('input', actualizarTotal);
+        if(inpPrec) inpPrec.addEventListener('input', actualizarTotal);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const spanOrden = document.getElementById('textoOrdenActual');
+        if("{{ orden_actual }}" === "nombre_asc" || "{{ orden_actual }}" === "") {
+            if(spanOrden) spanOrden.innerText = "A - Z";
+        }
+
+        conectarPaginacionAjax();
+        conectarFormularios(); 
+
+        // Listeners Modals
         const modalVenta = document.getElementById('modalVenta');
-        if (modalVenta) {
+        if(modalVenta) {
             modalVenta.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
                 const id = button.getAttribute('data-id');
                 const nombre = button.getAttribute('data-nombre');
                 const precio = parseFloat(button.getAttribute('data-precio')) || 0;
                 const stock = parseInt(button.getAttribute('data-stock')) || 0;
-
+                
                 document.getElementById('ventaNombreProducto').textContent = nombre;
                 document.getElementById('ventaStock').textContent = stock;
-                document.getElementById('ventaPrecioInput').value = precio.toFixed(2);
+                document.getElementById('ventaPrecioInput').value = precio.toFixed(2); 
                 document.getElementById('ventaCantidadInput').value = 1;
                 document.getElementById('ventaCantidadInput').max = stock;
-
-                const currentUrl = new URLSearchParams(window.location.search);
-                const q = currentUrl.get('q') || '';
-                const orden = currentUrl.get('orden') || 'defecto';
-                const page = currentUrl.get('page') || 1;
-
-                document.getElementById('formVenta').action = `/vender/${id}?q=${q}&orden=${orden}&page=${page}`;
-                actualizarTotal();
+                document.getElementById('formVenta').action = `/vender/${id}`;
+                
+                const eventInput = new Event('input');
+                document.getElementById('ventaCantidadInput').dispatchEvent(eventInput);
             });
         }
 
-        const inpCant = document.getElementById('ventaCantidadInput');
-        const inpPrec = document.getElementById('ventaPrecioInput');
-        const dispTot = document.getElementById('ventaTotalDisplay');
-        function actualizarTotal() {
-            if (inpCant && inpPrec && dispTot) {
-                const c = parseFloat(inpCant.value) || 0;
-                const p = parseFloat(inpPrec.value) || 0;
-                dispTot.textContent = (c * p).toFixed(2);
-            }
-        }
-        if (inpCant) inpCant.addEventListener('input', actualizarTotal);
-        if (inpPrec) inpPrec.addEventListener('input', actualizarTotal);
-
-        // --- MODAL EDITAR ---
         const modalEditar = document.getElementById('modalEditar');
-        if (modalEditar) {
+        if(modalEditar) {
             modalEditar.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
                 const id = button.getAttribute('data-id');
@@ -206,33 +264,20 @@
                 document.getElementById('editCantidad').value = button.getAttribute('data-cantidad');
                 document.getElementById('editCosto').value = button.getAttribute('data-costo');
                 document.getElementById('editPrecio').value = button.getAttribute('data-precio');
-
-                const currentUrl = new URLSearchParams(window.location.search);
-                const q = currentUrl.get('q') || '';
-                const orden = currentUrl.get('orden') || 'defecto';
-                const page = currentUrl.get('page') || 1;
-
-                document.getElementById('formEditar').action = `/editar/${id}?q=${q}&orden=${orden}&page=${page}`;
+                document.getElementById('formEditar').action = `/editar/${id}`;
             });
         }
 
-        // --- NUEVO: MODAL PEDIDO (LISTA DE COMPRAS) ---
         const modalPedido = document.getElementById('modalPedido');
-        if (modalPedido) {
+        if(modalPedido) {
             modalPedido.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
                 const id = button.getAttribute('data-id');
                 const nombre = button.getAttribute('data-nombre');
                 const codigo = button.getAttribute('data-codigo');
-                
                 document.getElementById('pedidoNombreProducto').textContent = nombre;
                 document.getElementById('pedidoCodigo').textContent = codigo;
-                
-                const currentUrl = new URLSearchParams(window.location.search);
-                const q = currentUrl.get('q') || '';
-                const orden = currentUrl.get('orden') || 'defecto';
-                const page = currentUrl.get('page') || 1;
-                document.getElementById('formPedido').action = `/agregar_pedido/${id}?q=${q}&orden=${orden}&page=${page}`;
+                document.getElementById('formPedido').action = `/agregar_pedido/${id}`;
             });
         }
     });
@@ -304,12 +349,10 @@
                     <h6 class="text-center text-muted text-uppercase small ls-1">Producto a reponer</h6>
                     <h4 id="pedidoNombreProducto" class="text-center fw-bold mb-1">Nombre</h4>
                     <div class="text-center mb-4"><span id="pedidoCodigo" class="badge bg-light text-dark border">COD-000</span></div>
-                    
                     <div class="form-floating mb-3">
                         <input type="number" name="cantidad" class="form-control fw-bold fs-5 text-center" value="10" min="1" required>
                         <label>Cantidad a Comprar</label>
                     </div>
-
                     <div class="card bg-light border-0 p-3 mb-3">
                         <div class="small fw-bold text-muted mb-2">DATOS DE PROVEEDOR (OPCIONAL)</div>
                         <div class="row g-2">

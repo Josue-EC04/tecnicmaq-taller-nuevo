@@ -1,79 +1,38 @@
 <style>
     @media (max-width: 768px) {
-        /* Ocultar encabezados de tabla clásica */
         .table-modern thead { display: none; }
-        
-        /* Convertir filas en tarjetas */
-        .table-modern tr { 
-            display: block; 
-            margin-bottom: 1.5rem; 
-            border-radius: 16px; 
-            background: #ffffff; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
-            border: 1px solid #f0f0f0; 
-            overflow: hidden; 
-        }
-        
-        /* Convertir celdas en filas dentro de la tarjeta */
-        .table-modern td { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 1rem 1.2rem; 
-            text-align: right; 
-            border-bottom: 1px solid #f8f9fa; 
-        }
-        
-        /* Etiquetas automáticas (Stock, Costo, etc.) */
-        .table-modern td::before { 
-            content: attr(data-label); 
-            font-weight: 700; 
-            color: #adb5bd; 
-            font-size: 0.75rem; 
-            text-transform: uppercase; 
-            letter-spacing: 1px;
-        }
-
-        /* DISEÑO ESPECIAL: PRIMERA CELDA (FOTO Y NOMBRE) */
-        .table-modern td:first-child { 
-            display: block; 
-            text-align: center; 
-            background: #f8f9fa; 
-            padding: 1.5rem; 
-        }
-        .table-modern td:first-child::before { display: none; } /* Sin etiqueta */
-        .table-modern td:first-child .d-flex { 
-            flex-direction: column; 
-            align-items: center; 
-        }
-        .table-modern td:first-child .img-zoom { 
-            width: 100px; 
-            height: 100px; 
-            margin-right: 0 !important; 
-            margin-bottom: 1rem; 
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
+        .table-modern tr { display: block; margin-bottom: 1.5rem; border-radius: 16px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; overflow: hidden; }
+        .table-modern td { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem; text-align: right; border-bottom: 1px solid #f8f9fa; }
+        .table-modern td::before { content: attr(data-label); font-weight: 700; color: #adb5bd; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+        .table-modern td:first-child { display: block; text-align: center; background: #f8f9fa; padding: 1.5rem; }
+        .table-modern td:first-child::before { display: none; }
+        .table-modern td:first-child .d-flex { flex-direction: column; align-items: center; }
+        .table-modern td:first-child .img-zoom { width: 100px; height: 100px; margin-right: 0 !important; margin-bottom: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .table-modern td:first-child .fw-bold { font-size: 1.1rem; margin-bottom: 5px; }
-
-        /* DISEÑO ESPECIAL: ÚLTIMA CELDA (BOTONES) */
-        .table-modern td:last-child { 
-            display: block; 
-            padding: 1rem; 
-            background: #fff; 
-            border-bottom: none;
-        }
+        .table-modern td:last-child { display: block; padding: 1rem; background: #fff; border-bottom: none; }
         .table-modern td:last-child::before { display: none; }
-        .table-modern td:last-child .btn-group { 
-            display: flex; 
-            gap: 8px; 
-            width: 100%; 
-        }
-        .table-modern td:last-child .btn { flex: 1; } /* Botones anchos */
+        .table-modern td:last-child .btn-group { display: flex; gap: 8px; width: 100%; }
+        .table-modern td:last-child .btn { flex: 1; }
     }
 </style>
 
 <div class="card-body p-0">
+    <div class="bg-white border-bottom py-3 d-flex justify-content-center">
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link border-0 fw-bold bg-transparent text-muted">Pág {{ pagination.page }} de {{ pagination.pages }}</span>
+                </li>
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-modern mb-0 w-100">
             <thead>
@@ -88,6 +47,14 @@
             </thead>
             <tbody>
                 {% for r in repuestos %}
+                
+                {% set ns = namespace(en_lista=false) %}
+                {% for p in r.pedidos %}
+                    {% if p.estado == 'Pendiente' %}
+                        {% set ns.en_lista = true %}
+                    {% endif %}
+                {% endfor %}
+
                 <tr>
                     <td class="ps-4">
                         <div class="d-flex align-items-center">
@@ -128,11 +95,17 @@
                                 <button class="btn btn-sm btn-light text-muted border" disabled>Agotado</button>
                             {% endif %}
                             
-                            <button type="button" class="btn btn-sm btn-info text-white shadow-sm" 
-                                    data-bs-toggle="modal" data-bs-target="#modalPedido"
-                                    data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-codigo="{{ r.codigo }}">
-                                <i class="bi bi-cart-plus-fill"></i>
-                            </button>
+                            {% if ns.en_lista %}
+                                <button type="button" class="btn btn-sm btn-secondary text-white shadow-sm" title="Ya está en la lista de compras" disabled>
+                                    <i class="bi bi-cart-check-fill"></i>
+                                </button>
+                            {% else %}
+                                <button type="button" class="btn btn-sm btn-info text-white shadow-sm" 
+                                        data-bs-toggle="modal" data-bs-target="#modalPedido" title="Agregar a compras"
+                                        data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-codigo="{{ r.codigo }}">
+                                    <i class="bi bi-cart-plus-fill"></i>
+                                </button>
+                            {% endif %}
                             
                             <button type="button" class="btn btn-sm btn-white border text-primary"
                                     data-bs-toggle="modal" data-bs-target="#modalEditar"
