@@ -1,6 +1,10 @@
 from app import create_app, db
 from app.models import Usuario
 from werkzeug.security import generate_password_hash
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 app = create_app()
 
@@ -22,4 +26,4 @@ with app.app_context():
     db.session.add(nuevo_admin)
     db.session.commit()
     
-    print(f"✅ Tablas creadas y usuario '{usuario}' configurado con éxito.")
+    print(f"OK: Tablas creadas y usuario '{usuario}' configurado con exito.")

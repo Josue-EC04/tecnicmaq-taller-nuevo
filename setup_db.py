@@ -1,6 +1,9 @@
 # Archivo: setup_db.py
 from app import create_app, db
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = create_app()
 
