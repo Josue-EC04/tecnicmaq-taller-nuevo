@@ -23,8 +23,8 @@
   .map-popup-btn { flex: 1; padding: 7px 10px; border-radius: 8px; font-size: 12px;
                    font-weight: 600; text-decoration: none; display: flex; align-items: center;
                    justify-content: center; gap: 5px; cursor: pointer; border: none; }
-  .map-popup-btn-wa  { background: #25D366; color: #fff; }
-  .map-popup-btn-ruta { background: #1D4ED8; color: #fff; }
+  .map-popup-btn-wa  { background: #25D366 !important; color: #fff !important; }
+  .map-popup-btn-ruta { background: #1D4ED8 !important; color: #fff !important; }
   .map-popup-btn-tel { background: var(--bg-subtle); color: var(--text-2); border: 1px solid var(--border); }
 </style>
 {% endblock %}
@@ -123,7 +123,7 @@
             <i class="bi bi-pencil"></i>
           </button>
           <a href="{{ url_for('main.eliminar_tienda', id=t.id) }}"
-             onclick="event.stopPropagation(); return confirm('¿Eliminar esta tienda del directorio?');"
+             onclick="event.stopPropagation(); if(confirm('¿Eliminar esta tienda del directorio?')) { window.location.href = this.href; } event.preventDefault(); return false;"
              style="background:none; border:1px solid transparent; border-radius:6px; padding:4px 7px;
                     color:var(--text-4); text-decoration:none; font-size:12px; transition:all .15s;"
              onmouseover="this.style.color='#E8001E'; this.style.borderColor='#FECDD3'; this.style.background='#FFF1F2';"
@@ -172,7 +172,7 @@
         </span>
         {% endif %}
         {% if t.latitud %}
-        <a href="https://www.google.com/maps/dir/-12.0651,-75.2049/{{ t.latitud }},{{ t.longitud }}"
+        <a href="https://www.google.com/maps/dir/-12.006110372584173,-75.24381153853837/{{ t.latitud }},{{ t.longitud }}"
            target="_blank"
            onclick="event.stopPropagation();"
            style="font-size:11px; padding:4px 9px; border-radius:6px; background:#EFF6FF;
@@ -418,8 +418,8 @@
 {% block extra_scripts %}
 <script>
 // ── Coordenadas del taller (San Agustín de Cajas) ──
-const TALLER_LAT = -12.0651;
-const TALLER_LNG = -75.2049;
+const TALLER_LAT = -12.006110372584173;
+const TALLER_LNG = -75.24381153853837;
 
 // ── Ícono del marcador taller ──
 const iconoTaller = L.divIcon({
@@ -445,7 +445,7 @@ function iconoTienda(favorita) {
 }
 
 // ── Inicializar mapa principal ──
-const mapa = L.map('mapa-directorio').setView([-12.0630, -75.2049], 14);
+const mapa = L.map('mapa-directorio').setView([TALLER_LAT, TALLER_LNG], 14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors',
   maxZoom: 19
@@ -513,7 +513,7 @@ let miniMarcador = null;
 
 document.getElementById('modalAgregarTienda').addEventListener('shown.bs.modal', () => {
   if (!miniMapa) {
-    miniMapa = L.map('mini-mapa-selector').setView([-12.0630, -75.2049], 15);
+    miniMapa = L.map('mini-mapa-selector').setView([TALLER_LAT, TALLER_LNG], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(miniMapa);
     miniMapa.on('click', e => {
       document.getElementById('inputLat').value = e.latlng.lat.toFixed(6);
