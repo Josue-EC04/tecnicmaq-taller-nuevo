@@ -55,11 +55,7 @@
         <div style="display:flex; align-items:center; gap:12px;">
           <img src="{{ url_for('static', filename='uploads/' + (r.imagen_filename if r.imagen_filename else 'default.jpg')) }}"
                alt="{{ r.nombre }}"
-               style="width:42px; height:42px; object-fit:cover; border-radius:8px;
-                      border:1px solid var(--border); flex-shrink:0; cursor:zoom-in;
-                      transition:transform .2s, box-shadow .2s;"
-               onmouseover="this.style.transform='scale(4)'; this.style.zIndex='500'; this.style.position='relative'; this.style.boxShadow='0 8px 30px rgba(0,0,0,.2)'; this.style.borderRadius='4px';"
-               onmouseout="this.style.transform=''; this.style.zIndex=''; this.style.position=''; this.style.boxShadow=''; this.style.borderRadius='8px';">
+               class="eck-table-img">
           <div style="min-width:0;">
             <div style="margin-bottom:3px;">
               <span class="eck-code">{{ r.codigo }}</span>
