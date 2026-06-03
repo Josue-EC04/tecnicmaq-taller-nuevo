@@ -18,7 +18,7 @@
                     <div class="mb-3">
                         <label class="form-label">Imagen (Dejar en blanco para mantener la actual)</label>
                         <div class="d-flex align-items-center gap-3">
-                            <img src="{{ url_for('static', filename='uploads/' + repuesto.imagen_filename) }}" width="50" class="rounded border">
+                            <img src="{{ repuesto.imagen_url }}" width="50" class="rounded border">
                             <input type="file" name="imagen" class="form-control" accept="image/*">
                         </div>
                     </div>

@@ -18,7 +18,7 @@
             <div class="card-body p-4 bg-white">
                 
                 <div class="d-flex align-items-center bg-light p-3 rounded-3 mb-4 border">
-                    <img src="{{ url_for('static', filename='uploads/' + repuesto.imagen_filename) }}" class="rounded me-3 shadow-sm" width="60" height="60" style="object-fit: cover;">
+                    <img src="{{ repuesto.imagen_url }}" class="rounded me-3 shadow-sm" width="60" height="60" style="object-fit: cover;">
                     <div>
                         <h6 class="fw-bold mb-0 text-truncate" style="max-width: 200px;">{{ repuesto.nombre }}</h6>
                         <small class="text-muted">{{ repuesto.codigo }}</small>

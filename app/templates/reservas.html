@@ -26,7 +26,7 @@
             <div class="card-body p-0">
                 <div class="d-flex align-items-center p-3 bg-light border-bottom gap-3">
                     {% if reserva.repuesto %}
-                        <img src="{{ url_for('static', filename='uploads/' + reserva.repuesto.imagen_filename) }}" class="rounded-3 border shadow-sm" width="70" height="70" style="object-fit: cover;">
+                        <img src="{{ reserva.repuesto.imagen_url }}" class="rounded-3 border shadow-sm" width="70" height="70" style="object-fit: cover;">
                         <div>
                             <h6 class="fw-bold mb-1 text-truncate" style="max-width: 200px;">{{ reserva.repuesto.nombre }}</h6>
                             <small class="text-muted d-block">{{ reserva.repuesto.codigo }}</small>

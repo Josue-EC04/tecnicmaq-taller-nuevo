@@ -53,9 +53,7 @@
       <!-- Producto -->
       <td style="padding-left:20px;">
         <div style="display:flex; align-items:center; gap:12px;">
-          <img src="{{ url_for('static', filename='uploads/' + (r.imagen_filename if r.imagen_filename else 'default.jpg')) }}"
-               alt="{{ r.nombre }}"
-               class="eck-table-img">
+          <img src="{{ r.imagen_url }}" alt="{{ r.nombre }}" class="eck-table-img">
           <div style="min-width:0;">
             <div style="margin-bottom:3px;">
               <span class="eck-code">{{ r.codigo }}</span>

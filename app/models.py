@@ -22,6 +22,12 @@ class Repuesto(db.Model):
     lote_id = db.Column(db.String(50), nullable=True)
     pedidos = db.relationship('PedidoCompra', backref='repuesto', lazy=True)
 
+    @property
+    def imagen_url(self):
+        if self.imagen_filename and (self.imagen_filename.startswith('http://') or self.imagen_filename.startswith('https://')):
+            return self.imagen_filename
+        return '/static/uploads/' + (self.imagen_filename or 'default.jpg')
+
 class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     fecha = db.Column(db.DateTime, default=datetime.now)

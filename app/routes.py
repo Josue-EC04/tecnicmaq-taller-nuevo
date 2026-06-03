@@ -29,6 +29,33 @@ def guardar_imagen(file):
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         unique_filename = f"{uuid.uuid4().hex[:8]}_{filename}"
+        
+        supabase_url = os.environ.get('SUPABASE_URL')
+        supabase_key = os.environ.get('SUPABASE_KEY')
+        
+        if supabase_url and supabase_key:
+            try:
+                file.seek(0)
+                file_data = file.read()
+                content_type = file.content_type or 'image/jpeg'
+                
+                url = f"{supabase_url.rstrip('/')}/storage/v1/object/repuestos/{unique_filename}"
+                headers = {
+                    "Authorization": f"Bearer {supabase_key}",
+                    "apikey": supabase_key,
+                    "Content-Type": content_type
+                }
+                
+                resp = requests.post(url, data=file_data, headers=headers, timeout=12)
+                if resp.status_code == 200:
+                    public_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/repuestos/{unique_filename}"
+                    return public_url
+                else:
+                    print("Error al subir a Supabase Storage:", resp.status_code, resp.text)
+            except Exception as e:
+                print("Excepción al subir imagen a Supabase:", e)
+        
+        file.seek(0)
         file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
         file.save(file_path)
         return unique_filename

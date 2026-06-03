@@ -45,8 +45,8 @@
 
           <!-- Imagen + Info -->
           <div style="display:flex; align-items:center; gap:14px; padding:16px 18px; flex:1; min-width:0;">
-            {% if p.repuesto.imagen_filename %}
-            <img src="{{ url_for('static', filename='uploads/' + p.repuesto.imagen_filename) }}"
+            {% if p.repuesto.imagen_url %}
+            <img src="{{ p.repuesto.imagen_url }}"
                  alt="{{ p.repuesto.nombre }}"
                  style="width:68px; height:68px; object-fit:cover; border-radius:10px;
                         border:1px solid var(--border); flex-shrink:0;">
