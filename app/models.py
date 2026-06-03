@@ -72,6 +72,7 @@ class TiendaProveedor(db.Model):
     # Categorías de repuestos que vende (CSV: "focos,fusibles,alternadores")
     categorias_repuestos = db.Column(db.String(500), nullable=True)
     notas = db.Column(db.Text, nullable=True)               # "Confiables, buen precio"
+    google_maps_link = db.Column(db.String(500), nullable=True)
     # Geolocalización (centro de Huancayo)
     latitud = db.Column(db.Float, nullable=True)
     longitud = db.Column(db.Float, nullable=True)

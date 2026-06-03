@@ -9,6 +9,8 @@ from datetime import datetime, date
 from collections import defaultdict
 from sqlalchemy import func, desc
 import difflib
+import re
+import requests
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, Response, jsonify, session
 from werkzeug.utils import secure_filename
@@ -31,6 +33,42 @@ def guardar_imagen(file):
         file.save(file_path)
         return unique_filename
     return None
+
+def extraer_coordenadas_de_url(url):
+    if not url:
+        return None, None
+    url = url.strip()
+    # Si es un link acortado, resolver la redirección
+    if 'maps.app.goo.gl' in url or 'goo.gl/maps' in url:
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            resp = requests.head(url, allow_redirects=True, timeout=5, headers=headers)
+            url = resp.url
+        except Exception:
+            try:
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                resp = requests.get(url, allow_redirects=True, timeout=5, headers=headers)
+                url = resp.url
+            except Exception:
+                pass
+    
+    # Expresiones regulares para buscar coordenadas
+    # 1. Patrón clásico: @lat,lng,zoom
+    m = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    if m:
+        return float(m.group(1)), float(m.group(2))
+    
+    # 2. Patrón query: ?q=lat,lng
+    m = re.search(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    if m:
+        return float(m.group(1)), float(m.group(2))
+        
+    # 3. Patrón ll: ll=lat,lng
+    m = re.search(r'[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    if m:
+        return float(m.group(1)), float(m.group(2))
+
+    return None, None
 
 # --- RUTAS PRINCIPALES ---
 
@@ -741,6 +779,7 @@ def directorio():
                 'notas': t.notas or '',
                 'lat': t.latitud, 'lng': t.longitud,
                 'favorita': t.es_favorita,
+                'maps_link': t.google_maps_link or '',
             })
 
     return render_template('directorio.html',
@@ -754,6 +793,20 @@ def directorio():
 def agregar_tienda():
     try:
         cats = request.form.getlist('categorias_repuestos')
+        google_maps_link = request.form.get('google_maps_link', '').strip() or None
+        
+        lat_val = request.form.get('latitud')
+        lng_val = request.form.get('longitud')
+        
+        latitud = float(lat_val) if lat_val else None
+        longitud = float(lng_val) if lng_val else None
+        
+        if (latitud is None or longitud is None) and google_maps_link:
+            ext_lat, ext_lng = extraer_coordenadas_de_url(google_maps_link)
+            if ext_lat is not None and ext_lng is not None:
+                latitud = ext_lat
+                longitud = ext_lng
+
         t = TiendaProveedor(
             nombre=request.form.get('nombre', '').strip(),
             direccion=request.form.get('direccion', '').strip(),
@@ -763,8 +816,9 @@ def agregar_tienda():
             horario=request.form.get('horario', '').strip() or None,
             categorias_repuestos=','.join(cats) if cats else None,
             notas=request.form.get('notas', '').strip() or None,
-            latitud=float(request.form.get('latitud') or 0) or None,
-            longitud=float(request.form.get('longitud') or 0) or None,
+            google_maps_link=google_maps_link,
+            latitud=latitud,
+            longitud=longitud,
         )
         db.session.add(t)
         db.session.commit()
@@ -787,6 +841,20 @@ def toggle_favorita(id):
 def editar_tienda(id):
     t = TiendaProveedor.query.get_or_404(id)
     cats = request.form.getlist('categorias_repuestos')
+    google_maps_link = request.form.get('google_maps_link', '').strip() or None
+    
+    lat_val = request.form.get('latitud')
+    lng_val = request.form.get('longitud')
+    
+    latitud = float(lat_val) if lat_val else None
+    longitud = float(lng_val) if lng_val else None
+
+    if google_maps_link and (google_maps_link != t.google_maps_link or latitud is None or longitud is None):
+        ext_lat, ext_lng = extraer_coordenadas_de_url(google_maps_link)
+        if ext_lat is not None and ext_lng is not None:
+            latitud = ext_lat
+            longitud = ext_lng
+
     t.nombre      = request.form.get('nombre', '').strip()
     t.direccion   = request.form.get('direccion', '').strip()
     t.referencia  = request.form.get('referencia', '').strip() or None
@@ -795,8 +863,9 @@ def editar_tienda(id):
     t.horario     = request.form.get('horario', '').strip() or None
     t.categorias_repuestos = ','.join(cats) if cats else None
     t.notas       = request.form.get('notas', '').strip() or None
-    t.latitud     = float(request.form.get('latitud') or 0) or None
-    t.longitud    = float(request.form.get('longitud') or 0) or None
+    t.google_maps_link = google_maps_link
+    t.latitud     = latitud
+    t.longitud    = longitud
     db.session.commit()
     flash(f'Tienda "{t.nombre}" actualizada.', 'success')
     return redirect(url_for('main.directorio'))

@@ -118,7 +118,7 @@
           </a>
           <button class="btn-eck btn-eck-ghost btn-eck-sm"
                   style="padding:4px 7px; font-size:12px;"
-                  onclick="event.stopPropagation(); abrirEditar({{ t.id }}, '{{ t.nombre|replace("'","\\'")|e }}', '{{ t.direccion|replace("'","\\'")|e }}', '{{ (t.referencia or '')|replace("'","\\'")|e }}', '{{ (t.telefono or '')|e }}', '{{ (t.whatsapp or '')|e }}', '{{ (t.horario or '')|e }}', '{{ (t.categorias_repuestos or '')|e }}', '{{ (t.notas or '')|replace("'","\\'")|e }}', {{ t.latitud or 'null' }}, {{ t.longitud or 'null' }})"
+                  onclick="event.stopPropagation(); abrirEditar({{ t.id }}, '{{ t.nombre|replace("'","\\'")|e }}', '{{ t.direccion|replace("'","\\'")|e }}', '{{ (t.referencia or '')|replace("'","\\'")|e }}', '{{ (t.telefono or '')|e }}', '{{ (t.whatsapp or '')|e }}', '{{ (t.horario or '')|e }}', '{{ (t.categorias_repuestos or '')|e }}', '{{ (t.notas or '')|replace("'","\\'")|e }}', {{ t.latitud or 'null' }}, {{ t.longitud or 'null' }}, '{{ (t.google_maps_link or '')|replace("'","\\'")|e }}')"
                   title="Editar">
             <i class="bi bi-pencil"></i>
           </button>
@@ -179,6 +179,16 @@
                   border:1px solid #BFDBFE; color:#1D4ED8; text-decoration:none;
                   display:flex; align-items:center; gap:4px; font-weight:600;">
           <i class="bi bi-map" style="font-size:10px;"></i> Ruta
+        </a>
+        {% endif %}
+        {% if t.google_maps_link %}
+        <a href="{{ t.google_maps_link }}"
+           target="_blank"
+           onclick="event.stopPropagation();"
+           style="font-size:11px; padding:4px 9px; border-radius:6px; background:#F0FDF4;
+                  border:1px solid #BBF7D0; color:#16A34A; text-decoration:none;
+                  display:flex; align-items:center; gap:4px; font-weight:600;">
+          <i class="bi bi-google" style="font-size:10px;"></i> Maps
         </a>
         {% endif %}
       </div>
@@ -286,6 +296,15 @@
 
           <!-- Coordenadas + tip de Google Maps -->
           <div>
+            <label class="eck-label">Enlace de Google Maps</label>
+            <input type="url" name="google_maps_link" id="inputMapsLink" class="eck-input"
+                   placeholder="Ej: https://www.google.com/maps/place/... o https://maps.app.goo.gl/...">
+            <div style="font-size:11.5px; color:var(--text-4); margin-top:3px; margin-bottom:12px;">
+              💡 Si pegas el enlace de Google Maps, el sistema autocompletará las coordenadas automáticamente.
+            </div>
+          </div>
+
+          <div>
             <label class="eck-label">Coordenadas GPS (para el mapa)</label>
             <div class="row g-2">
               <div class="col-6">
@@ -371,6 +390,14 @@
               {% endfor %}
             </div>
           </div>
+          <div>
+            <label class="eck-label">Enlace de Google Maps</label>
+            <input type="url" name="google_maps_link" id="e_maps_link" class="eck-input"
+                   placeholder="Ej: https://www.google.com/maps/place/...">
+            <div style="font-size:11.5px; color:var(--text-4); margin-top:3px; margin-bottom:12px;">
+              💡 Si pegas el enlace de Google Maps, el sistema autocompletará las coordenadas automáticamente.
+            </div>
+          </div>
           <div class="row g-2">
             <div class="col-6"><label class="eck-label">Latitud</label><input type="number" step="any" name="latitud" id="e_lat" class="eck-input mono"></div>
             <div class="col-6"><label class="eck-label">Longitud</label><input type="number" step="any" name="longitud" id="e_lng" class="eck-input mono"></div>
@@ -451,6 +478,8 @@ tiendas.forEach(t => {
   const rutaBtn = `<a href="https://www.google.com/maps/dir/${TALLER_LAT},${TALLER_LNG}/${t.lat},${t.lng}" target="_blank" class="map-popup-btn map-popup-btn-ruta"><i class="bi bi-map"></i> Ruta</a>`;
   const telBtn  = t.telefono
     ? `<a href="tel:${t.telefono}" class="map-popup-btn map-popup-btn-tel"><i class="bi bi-telephone"></i> Llamar</a>` : '';
+  const mapsBtn = t.maps_link
+    ? `<a href="${t.maps_link}" target="_blank" class="map-popup-btn" style="background:#22C55E; color:#fff; display:flex; align-items:center; justify-content:center;"><i class="bi bi-google"></i> Maps</a>` : '';
 
   m.bindPopup(`<div class="map-popup">
     <div class="map-popup-title">${t.favorita ? '⭐ ' : ''}${t.nombre}</div>
@@ -458,7 +487,7 @@ tiendas.forEach(t => {
     ${t.horario ? `<div style="font-size:11px; color:#6B7280; margin-bottom:6px;">🕐 ${t.horario}</div>` : ''}
     <div class="map-popup-tags">${tags}</div>
     ${t.notas ? `<div style="font-size:11px; color:#6B7280; margin-bottom:8px; font-style:italic;">"${t.notas}"</div>` : ''}
-    <div class="map-popup-actions">${waBtn}${rutaBtn}${telBtn}</div>
+    <div class="map-popup-actions">${waBtn}${rutaBtn}${telBtn}${mapsBtn}</div>
   </div>`, { maxWidth: 280 });
 
   m.on('click', () => {
@@ -504,7 +533,50 @@ function actualizarEstiloCheck(el) {
   lbl.style.color       = el.checked ? '#E8001E' : '';
 }
 
-function abrirEditar(id, nombre, dir, ref, tel, wa, horario, cats, notas, lat, lng) {
+function parsearCoordenadasGoogleMaps(url) {
+  if (!url) return null;
+  // Patrón clásico: @lat,lng,zoom
+  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  }
+  // Patrón query: ?q=lat,lng
+  match = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  }
+  // Patrón ll: ll=lat,lng
+  match = url.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  }
+  return null;
+}
+
+// Escuchar cambios en los inputs de Google Maps Link para autocompletar coordenadas
+document.getElementById('inputMapsLink').addEventListener('input', function() {
+  const coords = parsearCoordenadasGoogleMaps(this.value);
+  if (coords) {
+    document.getElementById('inputLat').value = coords.lat.toFixed(6);
+    document.getElementById('inputLng').value = coords.lng.toFixed(6);
+    if (miniMapa) {
+      const latlng = L.latLng(coords.lat, coords.lng);
+      miniMapa.setView(latlng, 17);
+      if (miniMarcador) miniMapa.removeLayer(miniMarcador);
+      miniMarcador = L.marker(latlng).addTo(miniMapa);
+    }
+  }
+});
+
+document.getElementById('e_maps_link').addEventListener('input', function() {
+  const coords = parsearCoordenadasGoogleMaps(this.value);
+  if (coords) {
+    document.getElementById('e_lat').value = coords.lat.toFixed(6);
+    document.getElementById('e_lng').value = coords.lng.toFixed(6);
+  }
+});
+
+function abrirEditar(id, nombre, dir, ref, tel, wa, horario, cats, notas, lat, lng, maps_link) {
   document.getElementById('formEditar').action = `/directorio/editar/${id}`;
   document.getElementById('e_nombre').value  = nombre;
   document.getElementById('e_dir').value     = dir;
@@ -515,6 +587,7 @@ function abrirEditar(id, nombre, dir, ref, tel, wa, horario, cats, notas, lat, l
   document.getElementById('e_notas').value   = notas;
   document.getElementById('e_lat').value     = lat || '';
   document.getElementById('e_lng').value     = lng || '';
+  document.getElementById('e_maps_link').value = maps_link || '';
 
   // Marcar checkboxes
   const catList = cats.split(',').map(c => c.trim());
