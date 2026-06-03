@@ -545,14 +545,15 @@ def descargar_backup():
                 'estado':            p.estado,
                 'proveedor_nombre':  p.proveedor_nombre  or '',
                 'proveedor_telefono':p.proveedor_telefono or '',
-                'fecha_pedido':      p.fecha_pedido.isoformat() if p.fecha_pedido else None,
+                'fecha_pedido':      p.fecha_creacion.isoformat() if p.fecha_creacion else None,
             })
 
         ventas = []
         for v in Venta.query.all():
+            r = Repuesto.query.filter_by(codigo=v.repuesto_codigo).first() if v.repuesto_codigo else None
             ventas.append({
                 'id':               v.id,
-                'repuesto_id':      v.repuesto_id,
+                'repuesto_id':      r.id if r else None,
                 'repuesto_nombre':  v.repuesto_nombre,
                 'repuesto_codigo':  v.repuesto_codigo  or '',
                 'cantidad':         v.cantidad,
