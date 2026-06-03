@@ -66,6 +66,18 @@
         Reportes de Ventas
       </a>
 
+      <a href="{{ url_for('main.residuos') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.residuos' }}">
+        <i class="bi bi-recycle"></i>
+        Gestión de Residuos
+      </a>
+
+      <a href="{{ url_for('main.directorio') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.directorio' }}">
+        <i class="bi bi-geo-alt"></i>
+        Directorio de Tiendas
+      </a>
+
       <div class="eck-nav-label">Sistema</div>
 
       <a href="{{ url_for('main.descargar_backup') }}" class="eck-nav-item">
