@@ -32,6 +32,10 @@ def guardar_imagen(file):
         
         supabase_url = os.environ.get('SUPABASE_URL')
         supabase_key = os.environ.get('SUPABASE_KEY')
+        if supabase_url:
+            supabase_url = supabase_url.strip()
+        if supabase_key:
+            supabase_key = supabase_key.strip()
         
         if supabase_url and supabase_key:
             try:
