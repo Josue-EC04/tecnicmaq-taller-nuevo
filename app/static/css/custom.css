@@ -411,11 +411,13 @@ body {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .eck-table {
   width: 100%;
+  min-width: 850px; /* Evita que las columnas se reduzcan y asegura espacio para los botones */
   border-collapse: collapse;
   font-size: 13.5px;
 }
