@@ -1,230 +1,274 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tecnicmaq ECK - Sistema</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
-    
-    <style>
-        .hover-bg-light:hover { background-color: #f8f9fa; color: #0d6efd !important; }
-        .nav-link { transition: all 0.2s ease; font-size: 0.95rem; }
-        .dropdown-menu { animation: fadeIn 0.2s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ECK Panel – Sistema de gestión Tecnicmaq Ingeniería Técnica">
+  <title>{% block title %}ECK Panel – Tecnicmaq{% endblock %}</title>
 
-        /* CHATBOT */
-        #chat-window { transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); transform-origin: bottom right; border-radius: 20px; overflow: hidden; border: none; }
-        .chat-header { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .chat-body { background-color: #f8f9fa; height: 350px; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .chat-body::-webkit-scrollbar { width: 6px; }
-        .chat-body::-webkit-scrollbar-thumb { background-color: #dee2e6; border-radius: 10px; }
-        .msg { max-width: 80%; padding: 10px 15px; border-radius: 18px; font-size: 0.9rem; position: relative; line-height: 1.4; animation: fadeIn 0.3s ease; word-wrap: break-word; }
-        .msg-bot { align-self: flex-start; background-color: white; color: #212529; border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .msg-user { align-self: flex-end; background-color: #0d6efd; color: white; border-bottom-right-radius: 4px; box-shadow: 0 2px 5px rgba(13, 110, 253, 0.2); }
-        .chat-footer { background: white; padding: 10px; border-top: 1px solid #eee; }
-        .btn-chat-toggle { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #0d6efd, #0dcaf0); box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); border: none; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; }
-        .btn-chat-toggle:hover { transform: scale(1.1); }
-    </style>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
-    
-    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top border-bottom" style="box-shadow: 0 4px 20px rgba(0,0,0,0.03); padding: 0.8rem 0;">
-        <div class="container-fluid px-4">
-            
-            <a class="navbar-brand d-flex align-items-center gap-3 py-0" href="/">
-                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" height="50" class="rounded-3 shadow-sm">
-                <div class="d-flex flex-column lh-1">
-                    <span class="fw-bold text-dark tracking-tight fs-5">TECNICMAQ</span>
-                    <span class="text-muted small text-uppercase" style="font-size: 0.7rem; letter-spacing: 1px; font-weight: 600;">ECK System</span>
-                </div>
-            </a>
 
-            <button class="navbar-toggler border-0 bg-light p-2 rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+{% if current_user.is_authenticated %}
+<div class="eck-layout">
 
-            <div class="collapse navbar-collapse" id="navbarMain">
-                <ul class="navbar-nav mx-auto align-items-center gap-1 my-3 my-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link px-3 py-2 rounded-pill d-flex align-items-center gap-2 fw-semibold {{ 'bg-primary text-white shadow-sm' if request.endpoint == 'main.inventario' else 'text-secondary hover-bg-light' }}" href="{{ url_for('main.inventario') }}">
-                            <i class="bi bi-box-seam"></i> Inventario
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link px-3 py-2 rounded-pill d-flex align-items-center gap-2 fw-semibold {{ 'bg-primary text-white shadow-sm' if request.endpoint == 'main.lista_compras' else 'text-secondary hover-bg-light' }}" href="{{ url_for('main.lista_compras') }}">
-                            <i class="bi bi-basket2"></i> Compras
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link px-3 py-2 rounded-pill d-flex align-items-center gap-2 fw-semibold {{ 'bg-primary text-white shadow-sm' if request.endpoint == 'main.historial_ventas' else 'text-secondary hover-bg-light' }}" href="{{ url_for('main.historial_ventas') }}">
-                            <i class="bi bi-graph-up-arrow"></i> Reportes
-                        </a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link px-3 py-2 rounded-pill d-flex align-items-center gap-2 fw-semibold text-secondary hover-bg-light dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-shield-lock"></i> Seguridad
-                        </a>
-                        <ul class="dropdown-menu border-0 shadow-lg p-2 rounded-4 mt-2">
-                            <li><a class="dropdown-item rounded-3 py-2" href="{{ url_for('main.descargar_backup') }}">💾 Descargar Backup</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item rounded-3 py-2" href="{{ url_for('main.subir_backup') }}">♻️ Restaurar Sistema</a></li>
-                        </ul>
-                    </li>
-                </ul>
+  <!-- ════════ SIDEBAR ════════ -->
+  <aside class="eck-sidebar" id="eckSidebar">
 
-                <div class="d-flex align-items-center gap-3">
-                    <div class="d-none d-xl-flex flex-column text-end lh-sm">
-                        <span class="fw-bold text-dark small">{{ current_user.username | default('Admin') }}</span>
-                        <span class="text-muted" style="font-size: 0.7rem;">Gerente</span>
-                    </div>
-                    <div class="dropdown">
-                        <a href="#" class="d-flex align-items-center text-decoration-none" data-bs-toggle="dropdown">
-                            <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center shadow border border-2 border-white" style="width: 42px; height: 42px; cursor: pointer; transition: transform 0.2s;">
-                                <i class="bi bi-person-fill fs-5"></i>
-                            </div>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg p-3 rounded-4 mt-3" style="min-width: 220px;">
-                            <li class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
-                                <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                    <i class="bi bi-person fs-5"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Hola, {{ current_user.username }}</h6>
-                                    <small class="text-muted">Administrador</small>
-                                </div>
-                            </li>
-                            <li>
-                                <a class="dropdown-item rounded-3 py-2 text-danger fw-bold d-flex align-items-center gap-2" href="{{ url_for('main.logout') }}">
-                                    <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- Logo -->
+    <a class="eck-sidebar-logo" href="{{ url_for('main.dashboard') }}">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo Tecnicmaq">
+      <div class="eck-logo-text">
+        <strong>TECNICMAQ</strong>
+        <span>ECK Panel</span>
+      </div>
+    </a>
+
+    <!-- Navegación -->
+    <nav class="eck-nav">
+
+      <a href="{{ url_for('main.dashboard') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.dashboard' }}">
+        <i class="bi bi-grid-1x2"></i>
+        Dashboard
+      </a>
+
+      <div class="eck-nav-label">Inventario</div>
+
+      <a href="{{ url_for('main.inventario') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.inventario' }}">
+        <i class="bi bi-boxes"></i>
+        Repuestos
+      </a>
+
+      <a href="{{ url_for('main.agregar') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.agregar' }}">
+        <i class="bi bi-plus-circle"></i>
+        Agregar Repuesto
+      </a>
+
+      <div class="eck-nav-label">Operaciones</div>
+
+      <a href="{{ url_for('main.lista_compras') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.lista_compras' }}">
+        <i class="bi bi-cart3"></i>
+        Lista de Compras
+      </a>
+
+      <a href="{{ url_for('main.historial_ventas') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.historial_ventas' }}">
+        <i class="bi bi-graph-up-arrow"></i>
+        Reportes de Ventas
+      </a>
+
+      <div class="eck-nav-label">Sistema</div>
+
+      <a href="{{ url_for('main.descargar_backup') }}" class="eck-nav-item">
+        <i class="bi bi-download"></i>
+        Descargar Backup
+      </a>
+
+      <a href="{{ url_for('main.subir_backup') }}"
+         class="eck-nav-item {{ 'active' if request.endpoint == 'main.subir_backup' }}">
+        <i class="bi bi-cloud-upload"></i>
+        Restaurar Sistema
+      </a>
+
     </nav>
 
-    <div class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </div>
-
-    <div id="chat-container" style="position: fixed; bottom: 30px; right: 30px; z-index: 1050;">
-        <div id="chat-window" class="card shadow-lg" style="width: 350px; display: none; margin-bottom: 20px;">
-            <div class="chat-header d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;"><i class="bi bi-robot"></i></div>
-                    <div><h6 class="mb-0 fw-bold">Asistente IA</h6><small class="opacity-75" style="font-size: 0.75rem;">● En línea</small></div>
-                </div>
-                <button onclick="toggleChat()" class="btn btn-sm text-white opacity-75 hover-opacity-100"><i class="bi bi-x-lg"></i></button>
-            </div>
-            <div id="chat-messages" class="chat-body">
-                <div class="msg msg-bot">Hola 👋, soy el asistente de <b>Tecnicmaq</b>. <br>Puedo ayudarte a buscar repuestos, consultar stock o darte reportes rápidos.</div>
-            </div>
-            <div class="chat-footer">
-                <div class="input-group">
-                    <input type="text" id="chat-input" class="form-control border-0 bg-light rounded-pill px-3" placeholder="Escribe tu consulta..." style="box-shadow: none;">
-                    <button onclick="enviarMensaje()" class="btn btn-primary rounded-circle ms-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;"><i class="bi bi-send-fill" style="font-size: 0.9rem;"></i></button>
-                </div>
-            </div>
-        </div>
-        <button onclick="toggleChat()" class="btn-chat-toggle text-white position-relative">
-            <i class="bi bi-chat-left-dots-fill fs-4"></i>
-            <span class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle"></span>
+    <!-- Footer usuario -->
+    <div class="eck-sidebar-footer">
+      <div class="dropdown">
+        <button class="eck-user-card" data-bs-toggle="dropdown" aria-expanded="false">
+          <div class="eck-avatar">
+            {{ (current_user.nombre or current_user.username)[0].upper() }}
+          </div>
+          <div class="eck-user-info">
+            <div class="eck-user-name">{{ current_user.nombre or current_user.username }}</div>
+            <div class="eck-user-role">Administrador</div>
+          </div>
+          <i class="bi bi-chevron-up" style="font-size:11px; color:var(--text-4);"></i>
         </button>
+        <ul class="dropdown-menu border-0 shadow-lg rounded-3 mb-1 w-100"
+            style="background:var(--bg); border:1px solid var(--border) !important; padding:6px;">
+          <li>
+            <a class="dropdown-item rounded-2 d-flex align-items-center gap-2 py-2"
+               href="{{ url_for('main.logout') }}"
+               style="font-size:13px; color:#DC2626;">
+              <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ════════ MAIN ════════ -->
+  <main class="eck-main">
+
+    <!-- Topbar -->
+    <div class="eck-topbar">
+      <button class="eck-menu-toggle" onclick="toggleSidebar()" id="menuToggle">
+        <i class="bi bi-list"></i>
+      </button>
+      <div class="eck-breadcrumb">
+        <span>Tecnicmaq</span>
+        <span>/</span>
+        <span style="color:var(--text-2); font-weight:500;">{% block breadcrumb %}Inicio{% endblock %}</span>
+      </div>
+      <div style="flex:1;"></div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // --- CHATBOT ---
-        function toggleChat() {
-            const chatWindow = document.getElementById('chat-window');
-            if (chatWindow.style.display === 'block') {
-                chatWindow.style.opacity = '0';
-                chatWindow.style.transform = 'scale(0.9) translateY(20px)';
-                setTimeout(() => { chatWindow.style.display = 'none'; }, 300);
-            } else {
-                chatWindow.style.display = 'block';
-                setTimeout(() => {
-                    chatWindow.style.opacity = '1';
-                    chatWindow.style.transform = 'scale(1) translateY(0)';
-                    document.getElementById('chat-input').focus();
-                }, 10);
-            }
-        }
+    <!-- Flash Messages -->
+    <div style="padding: 0 28px;">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            {% set icon = 'check-circle' if category == 'success' else 'exclamation-circle' if category == 'danger' else 'exclamation-triangle' if category == 'warning' else 'info-circle' %}
+            <div class="eck-flash eck-flash-{{ category }}" style="margin-top:16px;">
+              <i class="bi bi-{{ icon }}" style="flex-shrink:0;"></i>
+              <span style="flex:1;">{{ message }}</span>
+              <button onclick="this.closest('.eck-flash').remove()"
+                      style="background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:13px;padding:0;">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
 
-        document.getElementById('chat-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') enviarMensaje(); });
+    <!-- Contenido -->
+    <div class="eck-content">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
 
-        function enviarMensaje() {
-            const input = document.getElementById('chat-input');
-            const mensaje = input.value.trim();
-            if (!mensaje) return;
+<!-- Overlay mobile sidebar -->
+<div id="sidebarOverlay" onclick="toggleSidebar()"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:99;"></div>
 
-            agregarGlobo(mensaje, 'user');
-            input.value = '';
-            
-            const loadingId = agregarLoading();
+<!-- ════════ CHATBOT FAB ════════ -->
+<div id="eck-chat-fab">
+  <div class="eck-chat-bubble" id="eckChatBubble">
+    <div class="eck-chat-header">
+      <div>
+        <div class="eck-chat-title">Asistente IA</div>
+        <div class="eck-chat-status eck-chat-online">En línea</div>
+      </div>
+      <button onclick="toggleChat()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="eck-chat-messages" id="eckMessages">
+      <div class="eck-msg eck-msg-bot">Hola, soy el asistente de Tecnicmaq. Puedo ayudarte con consultas de stock, repuestos o reportes rápidos.</div>
+    </div>
+    <div class="eck-chat-input-row">
+      <input type="text" id="eckChatInput" class="eck-input" style="border-radius:8px; font-size:13px; padding:8px 12px;" placeholder="Escribe tu consulta...">
+      <button onclick="eckSend()" class="btn-eck btn-eck-primary" style="padding:8px 14px; border-radius:8px;">
+        <i class="bi bi-send-fill" style="font-size:12px;"></i>
+      </button>
+    </div>
+  </div>
+  <button class="eck-chat-fab-btn" onclick="toggleChat()" id="chatFabBtn" title="Asistente IA">
+    <i class="bi bi-robot" id="chatFabIcon"></i>
+  </button>
+</div>
 
-            fetch('/chatbot', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mensaje: mensaje})
-            })
-            .then(r => r.json())
-            .then(d => { removerLoading(loadingId); agregarGlobo(d.respuesta, 'bot'); })
-            .catch(e => { removerLoading(loadingId); agregarGlobo("⚠️ Error de conexión IA.", 'bot'); });
-        }
+{% endif %}
 
-        function agregarGlobo(texto, tipo) {
-            const div = document.createElement('div');
-            div.className = `msg msg-${tipo}`;
-            div.innerHTML = texto.replace(/\n/g, '<br>');
-            const container = document.getElementById('chat-messages');
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-        }
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ── SIDEBAR MOBILE ──
+function toggleSidebar() {
+  const sb = document.getElementById('eckSidebar');
+  const ov = document.getElementById('sidebarOverlay');
+  sb.classList.toggle('open');
+  ov.style.display = sb.classList.contains('open') ? 'block' : 'none';
+}
 
-        function agregarLoading() {
-            const id = 'loading-' + Date.now();
-            const div = document.createElement('div');
-            div.id = id;
-            div.className = 'msg msg-bot text-muted fst-italic';
-            div.innerHTML = '<span class="spinner-grow spinner-grow-sm" style="width: 0.5rem; height: 0.5rem;"></span> Escribiendo...';
-            document.getElementById('chat-messages').appendChild(div);
-            return id;
-        }
+// ── CHATBOT ──
+let chatOpen = false;
+function toggleChat() {
+  const bubble = document.getElementById('eckChatBubble');
+  const icon   = document.getElementById('chatFabIcon');
+  chatOpen = !chatOpen;
+  if (chatOpen) {
+    bubble.style.display = 'block';
+    setTimeout(() => bubble.classList.add('open'), 10);
+    icon.className = 'bi bi-x-lg';
+    document.getElementById('eckChatInput').focus();
+  } else {
+    bubble.classList.remove('open');
+    icon.className = 'bi bi-robot';
+    setTimeout(() => { bubble.style.display = 'none'; }, 220);
+  }
+}
 
-        function removerLoading(id) {
-            const el = document.getElementById(id);
-            if (el) el.remove();
-        }
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('eckChatInput');
+  if (inp) inp.addEventListener('keypress', e => { if(e.key === 'Enter') eckSend(); });
+});
 
-        // --- PREVENIR DOBLE ENVÍO DE FORMULARIOS ---
-        document.addEventListener("DOMContentLoaded", function() {
-            document.querySelectorAll('form').forEach(function(form) {
-                form.addEventListener('submit', function() {
-                    if (form.getAttribute('action') !== '/chatbot' && form.id !== 'formFiltros') {
-                        var btn = form.querySelector('button[type="submit"]');
-                        if (btn) {
-                            var original = btn.innerHTML;
-                            btn.disabled = true;
-                            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
-                            setTimeout(function() { btn.disabled = false; btn.innerHTML = original; }, 8000);
-                        }
-                    }
-                });
-            });
-        });
-    </script>
+function eckSend() {
+  const inp = document.getElementById('eckChatInput');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  eckAddMsg(msg, 'user');
+  inp.value = '';
+  const lid = eckAddLoading();
+  fetch('/chatbot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mensaje:msg}) })
+    .then(r => r.json())
+    .then(d => { eckRemoveLoading(lid); eckAddMsg(d.respuesta, 'bot'); })
+    .catch(() => { eckRemoveLoading(lid); eckAddMsg('Error de conexión.', 'bot'); });
+}
+
+function eckAddMsg(text, type) {
+  const div = document.createElement('div');
+  div.className = `eck-msg eck-msg-${type}`;
+  div.innerHTML = text.replace(/\n/g, '<br>');
+  const c = document.getElementById('eckMessages');
+  c.appendChild(div);
+  c.scrollTop = c.scrollHeight;
+}
+
+function eckAddLoading() {
+  const id = 'ld-' + Date.now();
+  const d = document.createElement('div');
+  d.id = id; d.className = 'eck-msg eck-msg-bot';
+  d.style.color = 'var(--text-4)';
+  d.innerHTML = '<span class="spinner-grow spinner-grow-sm" style="width:.45rem;height:.45rem;"></span> Escribiendo...';
+  document.getElementById('eckMessages').appendChild(d);
+  return id;
+}
+
+function eckRemoveLoading(id) {
+  const el = document.getElementById(id);
+  if(el) el.remove();
+}
+
+// ── PREVENIR DOBLE ENVÍO ──
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('form').forEach(form => {
+    if(form.id === 'formFiltros' || form.id === 'formBusqueda') return;
+    form.addEventListener('submit', function() {
+      const btn = this.querySelector('button[type="submit"]');
+      if(btn) {
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:.85em;height:.85em;"></span> Procesando...';
+        setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 8000);
+      }
+    });
+  });
+});
+</script>
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

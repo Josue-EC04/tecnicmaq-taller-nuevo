@@ -1,172 +1,385 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar Sesión - Tecnicmaq ECK</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            height: 100vh;
-            overflow: hidden; /* Evita scrollbars */
-        }
-        /* SECCIÓN IZQUIERDA (IMAGEN) */
-        .login-brand-section {
-            /* Imagen de fondo de taller moderno/tecnología. Cámbiala si deseas. */
-            background-image: url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?q=80&w=2070&auto=format&fit=crop');
-            background-size: cover;
-            background-position: center;
-            position: relative;
-            min-height: 100vh;
-        }
-        /* Capa oscura sobre la imagen para que el texto se lea bien */
-        .login-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, rgba(13, 110, 253, 0.8), rgba(0, 0, 0, 0.9)); /* Azul a Negro */
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            padding: 4rem;
-            color: white;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Acceso al sistema ECK Panel – Tecnicmaq Ingeniería Técnica">
+  <title>Iniciar Sesión – ECK Panel</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+    html,body { height:100%; font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
 
-        /* SECCIÓN DERECHA (FORMULARIO) */
-        .login-form-section {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #f8f9fa; /* Fondo gris muy suave */
-        }
-        .login-card {
-            width: 100%;
-            max-width: 450px;
-            padding: 3rem;
-            background: white;
-            border-radius: 24px; /* Bordes muy redondeados */
-            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
-        }
+    .login-root {
+      display: flex;
+      height: 100vh;
+      background: #fff;
+    }
 
-        /* Estilos de los Inputs Modernos (Floating Labels + Iconos) */
-        .input-group-text {
-            background: transparent;
-            border-right: none;
-            color: #6c757d;
-        }
-        .form-floating > .form-control {
-            border-left: none;
-            padding-left: 0.5rem;
-        }
-        .form-floating > .form-control:focus {
-            box-shadow: none;
-            border-color: #dee2e6;
-        }
-        .input-group:focus-within {
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-            border-radius: 0.375rem;
-        }
-        .input-group:focus-within .input-group-text,
-        .input-group:focus-within .form-control {
-            border-color: #86b7fe;
-        }
-        .btn-login {
-            padding: 0.8rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            border-radius: 12px;
-            transition: transform 0.2s;
-        }
-        .btn-login:hover {
-            transform: translateY(-2px); /* Pequeño efecto de elevación */
-            box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
-        }
-    </style>
+    /* ── PANEL IZQUIERDO (imagen/marca) ── */
+    .login-left {
+      flex: 1;
+      display: none;
+      position: relative;
+      overflow: hidden;
+      background: #0f0f10;
+    }
+    @media(min-width:900px){ .login-left { display:block; } }
+
+    .login-left-img {
+      position: absolute;
+      inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?q=80&w=1600&auto=format&fit=crop');
+      background-size: cover;
+      background-position: center;
+      opacity: .35;
+    }
+
+    .login-left-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(160deg, rgba(15,15,16,.6) 0%, rgba(232,0,30,.15) 100%);
+    }
+
+    .login-left-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 40px 48px;
+    }
+
+    .login-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .login-brand img {
+      height: 44px;
+      border-radius: 10px;
+    }
+
+    .login-brand-text strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: .3px;
+    }
+
+    .login-brand-text span {
+      font-size: 11px;
+      font-weight: 600;
+      color: #E8001E;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .login-hero {
+      padding-bottom: 10px;
+    }
+
+    .login-hero h1 {
+      font-size: 38px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+    }
+
+    .login-hero h1 em {
+      font-style: normal;
+      color: #E8001E;
+    }
+
+    .login-hero p {
+      font-size: 15px;
+      color: rgba(255,255,255,.55);
+      line-height: 1.7;
+      max-width: 340px;
+    }
+
+    .login-features {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 36px;
+    }
+
+    .login-feature {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255,255,255,.65);
+      font-size: 13.5px;
+      font-weight: 500;
+    }
+
+    .login-feature-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(232,0,30,.18);
+      border: 1px solid rgba(232,0,30,.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #E8001E;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .login-footer-brand {
+      font-size: 12px;
+      color: rgba(255,255,255,.3);
+    }
+
+    /* ── PANEL DERECHO (formulario) ── */
+    .login-right {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 48px 52px;
+      background: #fff;
+      border-left: 1px solid #E5E7EB;
+    }
+
+    @media(max-width:900px){ .login-right { max-width:100%; padding:40px 28px; } }
+
+    .login-logo-mobile {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 32px;
+    }
+    @media(min-width:900px){ .login-logo-mobile { display:none; } }
+
+    .login-logo-mobile img { height:38px; border-radius:8px; }
+    .login-logo-mobile strong { font-size:14px; font-weight:800; color:#111827; }
+    .login-logo-mobile span  { display:block; font-size:10px; font-weight:700; color:#E8001E; letter-spacing:1.5px; text-transform:uppercase; }
+
+    .login-heading {
+      font-size: 22px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: -.5px;
+      margin-bottom: 6px;
+    }
+
+    .login-subheading {
+      font-size: 13.5px;
+      color: #6B7280;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    .frm-group { margin-bottom: 16px; }
+
+    .frm-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+      letter-spacing: .15px;
+    }
+
+    .frm-input {
+      display: flex;
+      align-items: center;
+      border: 1px solid #E5E7EB;
+      border-radius: 10px;
+      background: #fff;
+      transition: border-color .18s, box-shadow .18s;
+      overflow: hidden;
+    }
+
+    .frm-input:focus-within {
+      border-color: #E8001E;
+      box-shadow: 0 0 0 3px rgba(232,0,30,.09);
+    }
+
+    .frm-input i {
+      padding: 0 14px;
+      color: #9CA3AF;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .frm-input input {
+      flex: 1;
+      border: none;
+      background: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: #111827;
+      padding: 11px 14px 11px 0;
+      outline: none;
+    }
+
+    .frm-input input::placeholder { color: #9CA3AF; }
+
+    .frm-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      width: 100%;
+      padding: 13px;
+      background: #E8001E;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background .18s, box-shadow .18s, transform .15s;
+      letter-spacing: .1px;
+    }
+
+    .frm-btn:hover {
+      background: #C0001A;
+      box-shadow: 0 4px 14px rgba(232,0,30,.3);
+      transform: translateY(-1px);
+    }
+
+    .frm-btn:active { transform: translateY(0); }
+
+    .login-error {
+      background: #FFF1F2;
+      border: 1px solid #FECDD3;
+      color: #E8001E;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 16px;
+    }
+
+    .login-copyright {
+      text-align: center;
+      font-size: 12px;
+      color: #9CA3AF;
+      margin-top: 24px;
+    }
+  </style>
 </head>
 <body>
+<div class="login-root">
 
-<div class="container-fluid p-0">
-    <div class="row g-0">
-        
-        <div class="col-lg-6 d-none d-lg-block login-brand-section">
-            <div class="login-overlay">
-                <div class="d-flex align-items-center gap-3 mb-4">
-                    <div class="bg-white text-primary rounded-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px;">
-                        <i class="bi bi-tools fs-2"></i>
-                    </div>
-                    <div>
-                        <h1 class="fw-bold mb-0 ls-tight">TECNICMAQ</h1>
-                        <p class="mb-0 opacity-75 text-uppercase ls-1">ECK System</p>
-                    </div>
-                </div>
-                <h2 class="display-5 fw-bold mb-3">Control total de tu taller.</h2>
-                <p class="lead opacity-75">Gestiona inventario, ventas y reservas con precisión y eficiencia profesional.</p>
-            </div>
+  <!-- ── IZQUIERDA ── -->
+  <div class="login-left">
+    <div class="login-left-img"></div>
+    <div class="login-left-overlay"></div>
+    <div class="login-left-content">
+
+      <div class="login-brand">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo">
+        <div class="login-brand-text">
+          <strong>TECNICMAQ</strong>
+          <span>ECK Panel</span>
         </div>
+      </div>
 
-        <div class="col-lg-6 login-form-section">
-            <div class="login-card needs-validation">
-                
-                <div class="text-center d-lg-none mb-4">
-                     <div class="bg-primary text-white rounded-3 d-inline-flex align-items-center justify-content-center shadow-sm mb-2" style="width: 50px; height: 50px;">
-                        <i class="bi bi-tools fs-3"></i>
-                    </div>
-                    <h3 class="fw-bold text-dark">Tecnicmaq ECK</h3>
-                </div>
-
-                <div class="mb-5 text-center text-lg-start">
-                    <h3 class="fw-bold text-dark">Bienvenido de nuevo</h3>
-                    <p class="text-muted">Ingresa tus credenciales para acceder al sistema.</p>
-                </div>
-
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} d-flex align-items-center shadow-sm border-0 rounded-3 mb-4" role="alert">
-                                <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-                                <div>{{ message }}</div>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-
-                <form method="POST">
-                    
-                    <div class="input-group mb-3 border rounded-3 bg-white overflow-hidden">
-                        <span class="input-group-text ps-3"><i class="bi bi-person fs-5"></i></span>
-                        <div class="form-floating flex-grow-1">
-                            <input type="text" class="form-control shadow-none" id="usernameInput" name="username" placeholder="Usuario" required>
-                            <label for="usernameInput">Nombre de Usuario</label>
-                        </div>
-                    </div>
-
-                    <div class="input-group mb-4 border rounded-3 bg-white overflow-hidden">
-                        <span class="input-group-text ps-3"><i class="bi bi-lock fs-5"></i></span>
-                        <div class="form-floating flex-grow-1">
-                            <input type="password" class="form-control shadow-none" id="passwordInput" name="password" placeholder="Contraseña" required>
-                            <label for="passwordInput">Contraseña</label>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 btn-login shadow-sm mb-4">
-                        Acceder al Sistema <i class="bi bi-arrow-right ms-2"></i>
-                    </button>
-
-                    <div class="text-center text-muted small">
-                        &copy; {{ datetime.now().year }} Tecnicmaq ECK System. Todos los derechos reservados.
-                    </div>
-                </form>
-            </div>
+      <div class="login-hero">
+        <h1>Control total<br>de tu <em>taller.</em></h1>
+        <p>Sistema de gestión profesional para inventario, ventas y pedidos de repuestos automotrices.</p>
+        <div class="login-features">
+          <div class="login-feature">
+            <div class="login-feature-dot"><i class="bi bi-boxes"></i></div>
+            Inventario y stock en tiempo real
+          </div>
+          <div class="login-feature">
+            <div class="login-feature-dot"><i class="bi bi-graph-up-arrow"></i></div>
+            Reportes de ventas y ganancias
+          </div>
+          <div class="login-feature">
+            <div class="login-feature-dot"><i class="bi bi-robot"></i></div>
+            Asistente IA integrado
+          </div>
+          <div class="login-feature">
+            <div class="login-feature-dot"><i class="bi bi-file-earmark-excel"></i></div>
+            Exportación e importación Excel
+          </div>
         </div>
+      </div>
 
+      <div class="login-footer-brand">
+        &copy; {{ datetime.now().year }} Tecnicmaq — Todos los derechos reservados.
+      </div>
     </div>
+  </div>
+
+  <!-- ── DERECHA ── -->
+  <div class="login-right">
+
+    <div class="login-logo-mobile">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo">
+      <div>
+        <strong>TECNICMAQ</strong>
+        <span>ECK Panel</span>
+      </div>
+    </div>
+
+    <h1 class="login-heading">Iniciar sesión</h1>
+    <p class="login-subheading">Ingresa tus credenciales para acceder al panel de gestión.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="login-error">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="frm-group">
+        <label class="frm-label" for="usernameInput">Nombre de usuario</label>
+        <div class="frm-input">
+          <i class="bi bi-person"></i>
+          <input type="text" id="usernameInput" name="username"
+                 placeholder="Ingresa tu usuario" required autofocus>
+        </div>
+      </div>
+
+      <div class="frm-group">
+        <label class="frm-label" for="passwordInput">Contraseña</label>
+        <div class="frm-input">
+          <i class="bi bi-lock"></i>
+          <input type="password" id="passwordInput" name="password"
+                 placeholder="••••••••••" required>
+        </div>
+      </div>
+
+      <button type="submit" class="frm-btn">
+        <i class="bi bi-box-arrow-in-right"></i>
+        Acceder al Sistema
+      </button>
+    </form>
+
+    <p class="login-copyright">
+      &copy; {{ datetime.now().year }} Tecnicmaq ECK Panel — Todos los derechos reservados.
+    </p>
+  </div>
+
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 </body>
 </html>

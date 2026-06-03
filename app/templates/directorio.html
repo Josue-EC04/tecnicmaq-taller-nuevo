@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+{% block title %}Directorio de Tiendas – ECK Panel{% endblock %}
+{% block breadcrumb %}Directorio de Tiendas{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  #mapa-directorio { height: 100%; min-height: 500px; border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+  .leaflet-popup-content-wrapper {
+    border-radius: 12px !important; box-shadow: 0 8px 30px rgba(0,0,0,0.15) !important;
+    border: 1px solid var(--border) !important; padding: 0 !important;
+  }
+  .leaflet-popup-content { margin: 0 !important; width: 260px !important; }
+  .map-popup { padding: 14px 16px; }
+  .map-popup-title { font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+  .map-popup-addr  { font-size: 12px; color: #6B7280; margin-bottom: 10px; }
+  .map-popup-tags  { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .map-popup-tag   { font-size: 10px; font-weight: 700; color: #E8001E; background: #FFF1F2;
+                      border: 1px solid #FECDD3; border-radius: 50px; padding: 2px 7px;
+                      text-transform: uppercase; letter-spacing: .4px; }
+  .map-popup-actions { display: flex; gap: 6px; }
+  .map-popup-btn { flex: 1; padding: 7px 10px; border-radius: 8px; font-size: 12px;
+                   font-weight: 600; text-decoration: none; display: flex; align-items: center;
+                   justify-content: center; gap: 5px; cursor: pointer; border: none; }
+  .map-popup-btn-wa  { background: #25D366; color: #fff; }
+  .map-popup-btn-ruta { background: #1D4ED8; color: #fff; }
+  .map-popup-btn-tel { background: var(--bg-subtle); color: var(--text-2); border: 1px solid var(--border); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="eck-page-header">
+  <div>
+    <h2 class="eck-heading">Directorio de Tiendas</h2>
+    <p class="eck-subheading">Proveedores de repuestos en el centro de Huancayo</p>
+  </div>
+  <button class="btn-eck btn-eck-primary" data-bs-toggle="modal" data-bs-target="#modalAgregarTienda">
+    <i class="bi bi-plus-lg"></i> Agregar Tienda
+  </button>
+</div>
+
+<!-- Barra de búsqueda y filtros -->
+<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
+  <form method="GET" action="{{ url_for('main.directorio') }}"
+        style="flex:1; min-width:220px; display:flex; gap:8px;">
+    <div style="position:relative; flex:1;">
+      <i class="bi bi-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-4); font-size:13px;"></i>
+      <input type="text" name="q" value="{{ buscar }}" class="eck-input"
+             style="padding-left:34px;" placeholder="Buscar tienda, repuesto...">
+    </div>
+    <select name="categoria" class="eck-input" style="width:auto; min-width:130px;" onchange="this.form.submit()">
+      <option value="">Todos los tipos</option>
+      {% for c in categorias %}
+      <option value="{{ c }}" {{ 'selected' if categ_f == c }}>{{ c }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-eck btn-eck-primary btn-eck-sm">Buscar</button>
+  </form>
+  <a href="{{ url_for('main.directorio', favoritas='1') }}"
+     class="btn-eck btn-eck-sm {{ 'btn-eck-primary' if favoritas else 'btn-eck-ghost' }}"
+     style="{{ 'background:#D97706; border-color:#D97706;' if favoritas }}">
+    <i class="bi bi-star{{ '-fill' if favoritas }}"></i> Favoritas
+  </a>
+  <a href="{{ url_for('main.directorio') }}" class="btn-eck btn-eck-ghost btn-eck-sm">
+    <i class="bi bi-arrow-counterclockwise"></i>
+  </a>
+</div>
+
+<!-- Layout split: lista izquierda + mapa derecha -->
+<div class="row g-0" style="min-height:520px; border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;">
+
+  <!-- Lista de tiendas (izquierda) -->
+  <div class="col-lg-5" style="border-right:1px solid var(--border); overflow-y:auto; max-height:600px;">
+    {% if tiendas %}
+
+    <div style="padding:10px 14px; border-bottom:1px solid var(--border); background:var(--bg-subtle);
+                font-size:11.5px; color:var(--text-4); font-weight:600;">
+      {{ tiendas|length }} tienda{{ 's' if tiendas|length != 1 }} encontradas
+    </div>
+
+    {% for t in tiendas %}
+    <div class="tienda-card"
+         id="tienda-{{ t.id }}"
+         onclick="resaltarMapa({{ t.id }}, {{ t.latitud or 'null' }}, {{ t.longitud or 'null' }})"
+         style="padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer;
+                transition:background .15s; position:relative;"
+         onmouseover="this.style.background='var(--bg-subtle)'"
+         onmouseout="this.style.background=''"
+    >
+      <!-- Fila superior -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+        <div style="min-width:0; flex:1;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+            {% if t.es_favorita %}
+            <i class="bi bi-star-fill" style="color:#D97706; font-size:11px;"></i>
+            {% endif %}
+            <span style="font-size:14px; font-weight:700; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              {{ t.nombre }}
+            </span>
+          </div>
+          <div style="font-size:11.5px; color:var(--text-3); margin-bottom:6px;">
+            <i class="bi bi-geo-alt" style="font-size:10px; color:var(--red);"></i>
+            {{ t.direccion }}
+            {% if t.referencia %}· <em>{{ t.referencia }}</em>{% endif %}
+          </div>
+        </div>
+        <!-- Acciones rápidas -->
+        <div style="display:flex; gap:4px; flex-shrink:0;">
+          <a href="{{ url_for('main.toggle_favorita', id=t.id) }}"
+             title="{{ 'Quitar de favoritas' if t.es_favorita else 'Marcar como favorita' }}"
+             style="background:none; border:1px solid var(--border); border-radius:6px; padding:4px 7px;
+                    color:{{ '#D97706' if t.es_favorita else 'var(--text-4)' }};
+                    text-decoration:none; font-size:12px; transition:all .15s;"
+             onclick="event.stopPropagation();">
+            <i class="bi bi-star{{ '-fill' if t.es_favorita }}"></i>
+          </a>
+          <button class="btn-eck btn-eck-ghost btn-eck-sm"
+                  style="padding:4px 7px; font-size:12px;"
+                  onclick="event.stopPropagation(); abrirEditar({{ t.id }}, '{{ t.nombre|replace("'","\\'")|e }}', '{{ t.direccion|replace("'","\\'")|e }}', '{{ (t.referencia or '')|replace("'","\\'")|e }}', '{{ (t.telefono or '')|e }}', '{{ (t.whatsapp or '')|e }}', '{{ (t.horario or '')|e }}', '{{ (t.categorias_repuestos or '')|e }}', '{{ (t.notas or '')|replace("'","\\'")|e }}', {{ t.latitud or 'null' }}, {{ t.longitud or 'null' }})"
+                  title="Editar">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <a href="{{ url_for('main.eliminar_tienda', id=t.id) }}"
+             onclick="event.stopPropagation(); return confirm('¿Eliminar esta tienda del directorio?');"
+             style="background:none; border:1px solid transparent; border-radius:6px; padding:4px 7px;
+                    color:var(--text-4); text-decoration:none; font-size:12px; transition:all .15s;"
+             onmouseover="this.style.color='#E8001E'; this.style.borderColor='#FECDD3'; this.style.background='#FFF1F2';"
+             onmouseout="this.style.color='var(--text-4)'; this.style.borderColor='transparent'; this.style.background='none';">
+            <i class="bi bi-trash"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Tags de categorías -->
+      {% if t.categorias_repuestos %}
+      <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">
+        {% for tag in t.categorias_repuestos.split(',') %}
+        <span style="font-size:10px; font-weight:700; color:var(--red); background:#FFF1F2;
+                     border:1px solid #FECDD3; border-radius:50px; padding:1px 7px;
+                     text-transform:uppercase; letter-spacing:.4px;">
+          {{ tag.strip() }}
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Info de contacto -->
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        {% if t.whatsapp %}
+        <a href="https://wa.me/51{{ t.whatsapp|replace(' ','')|replace('-','') }}"
+           target="_blank"
+           onclick="event.stopPropagation();"
+           class="map-popup-btn map-popup-btn-wa" style="font-size:11px; padding:4px 9px; border-radius:6px; text-decoration:none;">
+          <i class="bi bi-whatsapp"></i> {{ t.whatsapp }}
+        </a>
+        {% elif t.telefono %}
+        <a href="tel:{{ t.telefono }}"
+           onclick="event.stopPropagation();"
+           style="font-size:11px; padding:4px 9px; border-radius:6px; background:var(--bg-subtle);
+                  border:1px solid var(--border); color:var(--text-2); text-decoration:none;
+                  display:flex; align-items:center; gap:4px; font-weight:600;">
+          <i class="bi bi-telephone"></i> {{ t.telefono }}
+        </a>
+        {% endif %}
+        {% if t.horario %}
+        <span style="font-size:11px; padding:4px 9px; border-radius:6px; background:var(--bg-subtle);
+                     border:1px solid var(--border); color:var(--text-3); font-weight:500;
+                     display:flex; align-items:center; gap:4px;">
+          <i class="bi bi-clock" style="font-size:10px;"></i> {{ t.horario }}
+        </span>
+        {% endif %}
+        {% if t.latitud %}
+        <a href="https://www.google.com/maps/dir/-12.0651,-75.2049/{{ t.latitud }},{{ t.longitud }}"
+           target="_blank"
+           onclick="event.stopPropagation();"
+           style="font-size:11px; padding:4px 9px; border-radius:6px; background:#EFF6FF;
+                  border:1px solid #BFDBFE; color:#1D4ED8; text-decoration:none;
+                  display:flex; align-items:center; gap:4px; font-weight:600;">
+          <i class="bi bi-map" style="font-size:10px;"></i> Ruta
+        </a>
+        {% endif %}
+      </div>
+
+      {% if t.notas %}
+      <div style="margin-top:7px; font-size:11.5px; color:var(--text-3); font-style:italic;">
+        "{{ t.notas }}"
+      </div>
+      {% endif %}
+
+      {% if not t.latitud %}
+      <div style="margin-top:6px; font-size:10.5px; color:#D97706; display:flex; align-items:center; gap:4px;">
+        <i class="bi bi-exclamation-triangle" style="font-size:10px;"></i> Sin coordenadas — no aparece en el mapa
+      </div>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div style="padding:60px 20px; text-align:center;">
+      <i class="bi bi-shop" style="font-size:32px; color:var(--text-4); display:block; margin-bottom:12px;"></i>
+      <div style="font-size:14px; font-weight:600; color:var(--text-2); margin-bottom:6px;">Sin tiendas registradas</div>
+      <div style="font-size:13px; color:var(--text-4);">Agrega la primera tienda del directorio</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Mapa Leaflet (derecha) -->
+  <div class="col-lg-7">
+    <div id="mapa-directorio"></div>
+  </div>
+
+</div>
+
+
+<!-- ── MODAL Agregar Tienda ── -->
+<div class="modal fade" id="modalAgregarTienda" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+      <div style="background:var(--bg); border-bottom:1px solid var(--border); padding:18px 22px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-size:15px; font-weight:700; color:var(--text-1);">Agregar Tienda</div>
+          <div style="font-size:12px; color:var(--text-4);">Registrar proveedor en el directorio</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('main.agregar_tienda') }}">
+        <div style="padding:22px; display:flex; flex-direction:column; gap:14px; max-height:70vh; overflow-y:auto;">
+
+          <div class="row g-3">
+            <div class="col-8">
+              <label class="eck-label">Nombre de la Tienda</label>
+              <input type="text" name="nombre" class="eck-input" placeholder="Ej: Distribuidora Eléctrica La Central" required>
+            </div>
+            <div class="col-4">
+              <label class="eck-label">Horario</label>
+              <input type="text" name="horario" class="eck-input" placeholder="Lun-Sáb 8-7pm">
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-7">
+              <label class="eck-label">Dirección</label>
+              <input type="text" name="direccion" class="eck-input" placeholder="Ej: Jr. Puno 320, Huancayo">
+            </div>
+            <div class="col-5">
+              <label class="eck-label">Referencia / Stand</label>
+              <input type="text" name="referencia" class="eck-input" placeholder="Galería Modelo, stand 12">
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="eck-label">Teléfono</label>
+              <input type="text" name="telefono" class="eck-input" placeholder="064-xxx-xxx">
+            </div>
+            <div class="col-6">
+              <label class="eck-label" style="color:#25D366;">WhatsApp</label>
+              <input type="text" name="whatsapp" class="eck-input" placeholder="9xx-xxx-xxx">
+            </div>
+          </div>
+
+          <!-- Tipos de repuestos -->
+          <div>
+            <label class="eck-label">¿Qué repuestos vende? (selecciona todos los que apliquen)</label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+              {% for c in categorias %}
+              <label style="display:flex; align-items:center; gap:5px; cursor:pointer;
+                            font-size:12px; font-weight:600; padding:5px 11px;
+                            border:1px solid var(--border); border-radius:50px;
+                            transition:all .15s; user-select:none;"
+                     onmouseover="this.style.borderColor='#E8001E'; this.style.color='#E8001E';"
+                     onmouseout="if(!this.querySelector('input').checked){ this.style.borderColor='var(--border)'; this.style.color=''; }">
+                <input type="checkbox" name="categorias_repuestos" value="{{ c }}"
+                       style="display:none;"
+                       onchange="this.parentElement.style.background = this.checked ? '#FFF1F2' : '';
+                                  this.parentElement.style.borderColor = this.checked ? '#E8001E' : 'var(--border)';
+                                  this.parentElement.style.color = this.checked ? '#E8001E' : '';">
+                {{ c }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Coordenadas + tip de Google Maps -->
+          <div>
+            <label class="eck-label">Coordenadas GPS (para el mapa)</label>
+            <div class="row g-2">
+              <div class="col-6">
+                <input type="number" step="any" name="latitud" id="inputLat" class="eck-input mono"
+                       placeholder="-12.0651" value="">
+              </div>
+              <div class="col-6">
+                <input type="number" step="any" name="longitud" id="inputLng" class="eck-input mono"
+                       placeholder="-75.2049" value="">
+              </div>
+            </div>
+            <div style="margin-top:6px; padding:10px 12px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:var(--radius);">
+              <div style="font-size:11px; color:#1D4ED8; font-weight:700; margin-bottom:4px;">
+                ¿Cómo obtener coordenadas?
+              </div>
+              <div style="font-size:11px; color:#1E40AF; line-height:1.5;">
+                1. Abre <strong>Google Maps</strong> en el lugar de la tienda<br>
+                2. Haz clic derecho sobre el punto exacto → <strong>"¿Qué hay aquí?"</strong><br>
+                3. Copia los números que aparecen en la parte inferior (ej: <code>-12.0651, -75.2049</code>)
+              </div>
+            </div>
+            <!-- Mini mapa de selección de punto -->
+            <div id="mini-mapa-selector" style="height:200px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); margin-top:8px;"></div>
+            <div style="font-size:11px; color:var(--text-4); margin-top:4px; text-align:center;">
+              <i class="bi bi-hand-index"></i> También puedes hacer clic en el mapa para seleccionar la ubicación
+            </div>
+          </div>
+
+          <div>
+            <label class="eck-label">Notas (confiabilidad, precios, observaciones)</label>
+            <textarea name="notas" class="eck-input" rows="2"
+                      placeholder="Ej: Buenos precios en focos, piden factura, atienden sábados hasta las 8pm..."
+                      style="resize:vertical;"></textarea>
+          </div>
+        </div>
+
+        <div style="padding:14px 22px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end;">
+          <button type="button" class="btn-eck btn-eck-ghost" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn-eck btn-eck-primary">
+            <i class="bi bi-shop"></i> Guardar Tienda
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── MODAL Editar Tienda ── -->
+<div class="modal fade" id="modalEditarTienda" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+      <div style="background:var(--bg); border-bottom:1px solid var(--border); padding:18px 22px; display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-size:15px; font-weight:700; color:var(--text-1);">Editar Tienda</div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="formEditar">
+        <div style="padding:22px; display:flex; flex-direction:column; gap:14px; max-height:65vh; overflow-y:auto;">
+          <div class="row g-3">
+            <div class="col-8"><label class="eck-label">Nombre</label><input type="text" name="nombre" id="e_nombre" class="eck-input" required></div>
+            <div class="col-4"><label class="eck-label">Horario</label><input type="text" name="horario" id="e_horario" class="eck-input"></div>
+          </div>
+          <div class="row g-3">
+            <div class="col-7"><label class="eck-label">Dirección</label><input type="text" name="direccion" id="e_dir" class="eck-input"></div>
+            <div class="col-5"><label class="eck-label">Referencia</label><input type="text" name="referencia" id="e_ref" class="eck-input"></div>
+          </div>
+          <div class="row g-3">
+            <div class="col-6"><label class="eck-label">Teléfono</label><input type="text" name="telefono" id="e_tel" class="eck-input"></div>
+            <div class="col-6"><label class="eck-label">WhatsApp</label><input type="text" name="whatsapp" id="e_wa" class="eck-input"></div>
+          </div>
+          <div>
+            <label class="eck-label">Tipos de Repuestos</label>
+            <div id="e_cats" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+              {% for c in categorias %}
+              <label class="cat-edit-label" data-cat="{{ c }}"
+                     style="display:flex; align-items:center; gap:5px; cursor:pointer;
+                            font-size:12px; font-weight:600; padding:5px 11px;
+                            border:1px solid var(--border); border-radius:50px; transition:all .15s;">
+                <input type="checkbox" name="categorias_repuestos" value="{{ c }}" style="display:none;"
+                       onchange="actualizarEstiloCheck(this);">
+                {{ c }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6"><label class="eck-label">Latitud</label><input type="number" step="any" name="latitud" id="e_lat" class="eck-input mono"></div>
+            <div class="col-6"><label class="eck-label">Longitud</label><input type="number" step="any" name="longitud" id="e_lng" class="eck-input mono"></div>
+          </div>
+          <div><label class="eck-label">Notas</label><textarea name="notas" id="e_notas" class="eck-input" rows="2" style="resize:vertical;"></textarea></div>
+        </div>
+        <div style="padding:14px 22px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end;">
+          <button type="button" class="btn-eck btn-eck-ghost" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn-eck btn-eck-primary"><i class="bi bi-save"></i> Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ── Coordenadas del taller (San Agustín de Cajas) ──
+const TALLER_LAT = -12.0651;
+const TALLER_LNG = -75.2049;
+
+// ── Ícono del marcador taller ──
+const iconoTaller = L.divIcon({
+  html: `<div style="background:#E8001E; border:3px solid #fff; border-radius:50% 50% 50% 0;
+                     width:28px; height:28px; transform:rotate(-45deg); box-shadow:0 2px 8px rgba(0,0,0,.3);
+                     display:flex; align-items:center; justify-content:center;">
+           <span style="transform:rotate(45deg); font-size:12px;">🔧</span>
+         </div>`,
+  className: '', iconSize: [28,28], iconAnchor: [14,28], popupAnchor: [0,-30]
+});
+
+// ── Ícono tienda normal ──
+function iconoTienda(favorita) {
+  const bg = favorita ? '#D97706' : '#1D4ED8';
+  return L.divIcon({
+    html: `<div style="background:${bg}; border:3px solid #fff; border-radius:50% 50% 50% 0;
+                       width:24px; height:24px; transform:rotate(-45deg); box-shadow:0 2px 8px rgba(0,0,0,.25);
+                       display:flex; align-items:center; justify-content:center;">
+             <span style="transform:rotate(45deg); font-size:10px;">🏪</span>
+           </div>`,
+    className: '', iconSize: [24,24], iconAnchor: [12,24], popupAnchor: [0,-26]
+  });
+}
+
+// ── Inicializar mapa principal ──
+const mapa = L.map('mapa-directorio').setView([-12.0630, -75.2049], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(mapa);
+
+// Marcador del taller
+L.marker([TALLER_LAT, TALLER_LNG], { icon: iconoTaller })
+  .addTo(mapa)
+  .bindPopup(`<div class="map-popup">
+    <div class="map-popup-title">🔧 Tecnicmaq ECK</div>
+    <div class="map-popup-addr">San Agustín de Cajas, Huancayo</div>
+    <div style="font-size:11px; color:#6B7280;">← Ubicación del taller (punto de partida)</div>
+  </div>`)
+  .openPopup();
+
+// Marcadores de tiendas
+const tiendas = {{ tiendas_geo|safe }};
+const marcadores = {};
+
+tiendas.forEach(t => {
+  const m = L.marker([t.lat, t.lng], { icon: iconoTienda(t.favorita) }).addTo(mapa);
+  marcadores[t.id] = m;
+
+  const tags = t.categorias.split(',').filter(x=>x.trim())
+    .map(c => `<span class="map-popup-tag">${c.trim()}</span>`).join('');
+
+  const wa_num = t.whatsapp.replace(/\D/g,'');
+  const waBtn  = t.whatsapp
+    ? `<a href="https://wa.me/51${wa_num}" target="_blank" class="map-popup-btn map-popup-btn-wa"><i class="bi bi-whatsapp"></i> WhatsApp</a>` : '';
+  const rutaBtn = `<a href="https://www.google.com/maps/dir/${TALLER_LAT},${TALLER_LNG}/${t.lat},${t.lng}" target="_blank" class="map-popup-btn map-popup-btn-ruta"><i class="bi bi-map"></i> Ruta</a>`;
+  const telBtn  = t.telefono
+    ? `<a href="tel:${t.telefono}" class="map-popup-btn map-popup-btn-tel"><i class="bi bi-telephone"></i> Llamar</a>` : '';
+
+  m.bindPopup(`<div class="map-popup">
+    <div class="map-popup-title">${t.favorita ? '⭐ ' : ''}${t.nombre}</div>
+    <div class="map-popup-addr">${t.direccion}${t.referencia ? ' · ' + t.referencia : ''}</div>
+    ${t.horario ? `<div style="font-size:11px; color:#6B7280; margin-bottom:6px;">🕐 ${t.horario}</div>` : ''}
+    <div class="map-popup-tags">${tags}</div>
+    ${t.notas ? `<div style="font-size:11px; color:#6B7280; margin-bottom:8px; font-style:italic;">"${t.notas}"</div>` : ''}
+    <div class="map-popup-actions">${waBtn}${rutaBtn}${telBtn}</div>
+  </div>`, { maxWidth: 280 });
+
+  m.on('click', () => {
+    document.querySelectorAll('.tienda-card').forEach(el => el.style.background = '');
+    const card = document.getElementById('tienda-' + t.id);
+    if (card) { card.style.background = '#FFF1F2'; card.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+  });
+});
+
+// Click en card → centra el mapa
+function resaltarMapa(id, lat, lng) {
+  document.querySelectorAll('.tienda-card').forEach(el => el.style.background = '');
+  document.getElementById('tienda-' + id).style.background = '#FFF1F2';
+  if (lat && lng) {
+    mapa.setView([lat, lng], 17, { animate: true });
+    if (marcadores[id]) marcadores[id].openPopup();
+  }
+}
+
+// ── Mini mapa selector en el modal de agregar ──
+let miniMapa = null;
+let miniMarcador = null;
+
+document.getElementById('modalAgregarTienda').addEventListener('shown.bs.modal', () => {
+  if (!miniMapa) {
+    miniMapa = L.map('mini-mapa-selector').setView([-12.0630, -75.2049], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(miniMapa);
+    miniMapa.on('click', e => {
+      document.getElementById('inputLat').value = e.latlng.lat.toFixed(6);
+      document.getElementById('inputLng').value = e.latlng.lng.toFixed(6);
+      if (miniMarcador) miniMapa.removeLayer(miniMarcador);
+      miniMarcador = L.marker(e.latlng).addTo(miniMapa);
+    });
+  }
+  setTimeout(() => miniMapa.invalidateSize(), 300);
+});
+
+// ── Editar tienda ──
+function actualizarEstiloCheck(el) {
+  const lbl = el.parentElement;
+  lbl.style.background  = el.checked ? '#FFF1F2' : '';
+  lbl.style.borderColor = el.checked ? '#E8001E' : 'var(--border)';
+  lbl.style.color       = el.checked ? '#E8001E' : '';
+}
+
+function abrirEditar(id, nombre, dir, ref, tel, wa, horario, cats, notas, lat, lng) {
+  document.getElementById('formEditar').action = `/directorio/editar/${id}`;
+  document.getElementById('e_nombre').value  = nombre;
+  document.getElementById('e_dir').value     = dir;
+  document.getElementById('e_ref').value     = ref;
+  document.getElementById('e_tel').value     = tel;
+  document.getElementById('e_wa').value      = wa;
+  document.getElementById('e_horario').value = horario;
+  document.getElementById('e_notas').value   = notas;
+  document.getElementById('e_lat').value     = lat || '';
+  document.getElementById('e_lng').value     = lng || '';
+
+  // Marcar checkboxes
+  const catList = cats.split(',').map(c => c.trim());
+  document.querySelectorAll('.cat-edit-label').forEach(lbl => {
+    const cb = lbl.querySelector('input');
+    cb.checked = catList.includes(lbl.dataset.cat);
+    actualizarEstiloCheck(cb);
+  });
+
+  new bootstrap.Modal(document.getElementById('modalEditarTienda')).show();
+}
+</script>
+{% endblock %}

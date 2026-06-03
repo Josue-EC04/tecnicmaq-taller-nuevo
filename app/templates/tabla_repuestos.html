@@ -1,146 +1,202 @@
-<style>
-    @media (max-width: 768px) {
-        .table-modern thead { display: none; }
-        .table-modern tr { display: block; margin-bottom: 1.5rem; border-radius: 16px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; overflow: hidden; }
-        .table-modern td { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem; text-align: right; border-bottom: 1px solid #f8f9fa; }
-        .table-modern td::before { content: attr(data-label); font-weight: 700; color: #adb5bd; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
-        .table-modern td:first-child { display: block; text-align: center; background: #f8f9fa; padding: 1.5rem; }
-        .table-modern td:first-child::before { display: none; }
-        .table-modern td:first-child .d-flex { flex-direction: column; align-items: center; }
-        .table-modern td:first-child .img-zoom { width: 100px; height: 100px; margin-right: 0 !important; margin-bottom: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .table-modern td:first-child .fw-bold { font-size: 1.1rem; margin-bottom: 5px; }
-        .table-modern td:last-child { display: block; padding: 1rem; background: #fff; border-bottom: none; }
-        .table-modern td:last-child::before { display: none; }
-        .table-modern td:last-child .btn-group { display: flex; gap: 8px; width: 100%; }
-        .table-modern td:last-child .btn { flex: 1; }
-    }
-</style>
+<!-- Tabla de repuestos (cargada por AJAX en /inventario) -->
 
-<div class="card-body p-0">
-    <div class="bg-white border-bottom py-3 d-flex justify-content-center">
-        <nav>
-            <ul class="pagination pagination-sm mb-0">
-                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                    <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
-                </li>
-                <li class="page-item disabled">
-                    <span class="page-link border-0 fw-bold bg-transparent text-muted">Pág {{ pagination.page }} de {{ pagination.pages }}</span>
-                </li>
-                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                    <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>
-                </li>
-            </ul>
-        </nav>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-modern mb-0 w-100">
-            <thead>
-                <tr>
-                    <th class="ps-4">Producto</th>
-                    <th class="text-center">Stock</th>
-                    <th>Costo</th>
-                    <th>P. Venta</th>
-                    <th>Margen</th>
-                    <th class="text-end pe-4">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in repuestos %}
-                
-                {% set ns = namespace(en_lista=false) %}
-                {% for p in r.pedidos %}
-                    {% if p.estado == 'Pendiente' %}
-                        {% set ns.en_lista = true %}
-                    {% endif %}
-                {% endfor %}
-
-                <tr>
-                    <td class="ps-4">
-                        <div class="d-flex align-items-center">
-                            <img src="{{ url_for('static', filename='uploads/' + (r.imagen_filename if r.imagen_filename else 'default.jpg')) }}" class="img-zoom flex-shrink-0 me-3">
-                            <div>
-                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-2 px-2 mb-1" style="font-family: monospace; font-size: 0.75rem;">{{ r.codigo }}</span>
-                                <div class="fw-bold text-dark" style="font-size: 0.95rem;">{{ r.nombre }}</div>
-                                <small class="text-muted text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">{{ r.marca }}</small>
-                            </div>
-                        </div>
-                    </td>
-
-                    <td class="text-center align-middle" data-label="Stock">
-                        {% if r.cantidad <= 2 %}
-                            <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-2 border border-danger border-opacity-25">Crítico: {{ r.cantidad }}</span>
-                        {% elif r.cantidad < 5 %}
-                            <span class="badge bg-warning bg-opacity-10 text-warning-emphasis rounded-pill px-3 py-2 border border-warning border-opacity-25">Bajo: {{ r.cantidad }}</span>
-                        {% else %}
-                            <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 border border-success border-opacity-25">{{ r.cantidad }} uds.</span>
-                        {% endif %}
-                    </td>
-
-                    <td class="text-muted align-middle" style="font-family: monospace;" data-label="Costo">S/{{ "%.2f"|format(r.costo or 0) }}</td>
-                    <td class="fw-bold text-success fs-6 align-middle" style="font-family: monospace;" data-label="Precio Venta">S/{{ "%.2f"|format(r.precio or 0) }}</td>
-                    <td class="align-middle" data-label="Margen">
-                        <span class="badge bg-light text-dark border fw-normal text-muted">+ S/{{ "%.2f"|format((r.precio or 0) - (r.costo or 0)) }}</span>
-                    </td>
-
-                    <td class="text-end pe-4 align-middle">
-                        <div class="btn-group">
-                            {% if r.cantidad > 0 %}
-                                <button type="button" class="btn btn-sm btn-success fw-bold px-3 d-flex align-items-center gap-1 shadow-sm" 
-                                        data-bs-toggle="modal" data-bs-target="#modalVenta"
-                                        data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-precio="{{ r.precio or 0 }}" data-stock="{{ r.cantidad or 0 }}">
-                                    <i class="bi bi-cash"></i> <span class="d-none d-md-inline ms-1">Vender</span>
-                                </button>
-                            {% else %}
-                                <button class="btn btn-sm btn-light text-muted border" disabled>Agotado</button>
-                            {% endif %}
-                            
-                            {% if ns.en_lista %}
-                                <button type="button" class="btn btn-sm btn-secondary text-white shadow-sm" title="Ya está en la lista de compras" disabled>
-                                    <i class="bi bi-cart-check-fill"></i>
-                                </button>
-                            {% else %}
-                                <button type="button" class="btn btn-sm btn-info text-white shadow-sm" 
-                                        data-bs-toggle="modal" data-bs-target="#modalPedido" title="Agregar a compras"
-                                        data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-codigo="{{ r.codigo }}">
-                                    <i class="bi bi-cart-plus-fill"></i>
-                                </button>
-                            {% endif %}
-                            
-                            <button type="button" class="btn btn-sm btn-white border text-primary"
-                                    data-bs-toggle="modal" data-bs-target="#modalEditar"
-                                    data-id="{{ r.id }}" data-codigo="{{ r.codigo or '' }}" data-nombre="{{ r.nombre or '' }}"
-                                    data-marca="{{ r.marca or '' }}" data-cantidad="{{ r.cantidad or 0 }}"
-                                    data-costo="{{ r.costo or 0 }}" data-precio="{{ r.precio or 0 }}" title="Editar">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            
-                            <a href="{{ url_for('main.eliminar', id=r.id, q=busqueda, orden=orden_actual, page=pagination.page) }}" class="btn btn-sm btn-white border text-danger" onclick="return confirm('¿Eliminar definitivamente?');" title="Eliminar">
-                                <i class="bi bi-trash"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6" class="text-center py-5 text-muted">No se encontraron repuestos con esos términos.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<!-- Paginación SUPERIOR -->
+{% if pagination.pages > 1 %}
+<div style="padding:10px 20px; border-bottom:1px solid var(--border);
+            display:flex; align-items:center; justify-content:space-between;">
+  <span style="font-size:12px; color:var(--text-4); font-weight:600;">
+    {{ pagination.total }} repuesto{{ 's' if pagination.total != 1 }} · Página {{ pagination.page }} de {{ pagination.pages }}
+  </span>
+  <div style="display:flex; gap:4px; align-items:center;">
+    <a href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}"
+       class="eck-page-btn {{ 'disabled' if not pagination.has_prev }}"
+       style="{{ 'opacity:.4; pointer-events:none;' if not pagination.has_prev }}">
+      <i class="bi bi-chevron-left" style="font-size:11px;"></i>
+    </a>
+    {% for pg in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if pg %}
+        <a href="{{ url_for('main.inventario', page=pg, q=busqueda, orden=orden_actual) }}"
+           class="eck-page-btn {{ 'active' if pg == pagination.page }}">{{ pg }}</a>
+      {% else %}
+        <span style="padding:0 2px; color:var(--text-4); font-size:12px;">…</span>
+      {% endif %}
+    {% endfor %}
+    <a href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}"
+       class="eck-page-btn {{ 'disabled' if not pagination.has_next }}"
+       style="{{ 'opacity:.4; pointer-events:none;' if not pagination.has_next }}">
+      <i class="bi bi-chevron-right" style="font-size:11px;"></i>
+    </a>
+  </div>
 </div>
+{% endif %}
 
-<div class="card-footer bg-white border-top-0 py-4">
-    <nav>
-        <ul class="pagination justify-content-center mb-0">
-            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}">Anterior</a>
-            </li>
-            <li class="page-item disabled">
-                <span class="page-link border-0 fw-bold bg-transparent text-muted">Pág {{ pagination.page }} de {{ pagination.pages }}</span>
-            </li>
-            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                <a class="page-link shadow-sm border-0 rounded-pill px-3 mx-1" href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}">Siguiente</a>
-            </li>
-        </ul>
-    </nav>
+<table class="eck-table">
+  <thead>
+    <tr>
+      <th style="padding-left:20px; width:40%;">Repuesto</th>
+      <th class="text-center">Stock</th>
+      <th>Costo</th>
+      <th>P. Venta</th>
+      <th>Margen</th>
+      <th class="text-end" style="padding-right:20px;">Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in repuestos %}
+
+    {% set ns = namespace(en_lista=false) %}
+    {% for p in r.pedidos %}
+      {% if p.estado == 'Pendiente' %}{% set ns.en_lista = true %}{% endif %}
+    {% endfor %}
+
+    <tr>
+      <!-- Producto -->
+      <td style="padding-left:20px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <img src="{{ url_for('static', filename='uploads/' + (r.imagen_filename if r.imagen_filename else 'default.jpg')) }}"
+               alt="{{ r.nombre }}"
+               style="width:42px; height:42px; object-fit:cover; border-radius:8px;
+                      border:1px solid var(--border); flex-shrink:0; cursor:zoom-in;
+                      transition:transform .2s, box-shadow .2s;"
+               onmouseover="this.style.transform='scale(4)'; this.style.zIndex='500'; this.style.position='relative'; this.style.boxShadow='0 8px 30px rgba(0,0,0,.2)'; this.style.borderRadius='4px';"
+               onmouseout="this.style.transform=''; this.style.zIndex=''; this.style.position=''; this.style.boxShadow=''; this.style.borderRadius='8px';">
+          <div style="min-width:0;">
+            <div style="margin-bottom:3px;">
+              <span class="eck-code">{{ r.codigo }}</span>
+            </div>
+            <div style="font-size:13.5px; font-weight:600; color:var(--text-1);
+                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                 title="{{ r.nombre }}">{{ r.nombre }}</div>
+            {% if r.marca %}
+              <div style="font-size:11.5px; color:var(--text-4); text-transform:uppercase; letter-spacing:.5px;">{{ r.marca }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+
+      <!-- Stock -->
+      <td class="text-center">
+        {% if r.cantidad <= 2 %}
+          <span class="eck-stock-low">{{ r.cantidad }} uds.</span>
+        {% elif r.cantidad < 5 %}
+          <span class="eck-stock-mid">{{ r.cantidad }} uds.</span>
+        {% else %}
+          <span class="eck-stock-ok">{{ r.cantidad }} uds.</span>
+        {% endif %}
+      </td>
+
+      <!-- Costo -->
+      <td><span class="eck-price" style="color:var(--text-3);">S/{{ "%.2f"|format(r.costo or 0) }}</span></td>
+
+      <!-- Precio venta -->
+      <td><span class="eck-price-green">S/{{ "%.2f"|format(r.precio or 0) }}</span></td>
+
+      <!-- Margen -->
+      <td>
+        <span class="mono" style="font-size:12.5px; color:var(--text-3); font-weight:600;">
+          +S/{{ "%.2f"|format((r.precio or 0) - (r.costo or 0)) }}
+        </span>
+      </td>
+
+      <!-- Acciones -->
+      <td style="padding-right:20px;">
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
+
+          <!-- BOTÓN VENDER (siempre visible) -->
+          {% if r.cantidad > 0 %}
+          <button class="btn-eck btn-eck-sell"
+                  data-bs-toggle="modal" data-bs-target="#modalVenta"
+                  data-id="{{ r.id }}" data-nombre="{{ r.nombre }}"
+                  data-precio="{{ r.precio or 0 }}" data-stock="{{ r.cantidad or 0 }}">
+            <i class="bi bi-cash"></i> Vender
+          </button>
+          {% else %}
+          <span style="font-size:12px; color:var(--text-4); font-weight:600;
+                       background:var(--bg-hover); border:1px solid var(--border);
+                       border-radius:var(--radius-sm); padding:5px 10px;">Agotado</span>
+          {% endif %}
+
+          <!-- BOTÓN AGREGAR A COMPRAS (siempre visible) -->
+          {% if ns.en_lista %}
+          <button title="Ya está en lista de compras" disabled
+                  style="display:flex; align-items:center; justify-content:center;
+                         width:32px; height:32px; border-radius:var(--radius-sm);
+                         border:1px solid #FDE68A; background:#FFFBEB; color:#D97706;
+                         cursor:not-allowed; font-size:14px;">
+            <i class="bi bi-cart-check-fill"></i>
+          </button>
+          {% else %}
+          <button class="btn-eck btn-eck-sm"
+                  title="Agregar a lista de compras"
+                  data-bs-toggle="modal" data-bs-target="#modalPedido"
+                  data-id="{{ r.id }}" data-nombre="{{ r.nombre }}" data-codigo="{{ r.codigo }}"
+                  style="background:#EFF6FF; color:#1D4ED8; border-color:#BFDBFE;
+                         padding:5px 9px; font-size:14px;">
+            <i class="bi bi-cart-plus-fill"></i>
+          </button>
+          {% endif %}
+
+          <!-- MENÚ 3 PUNTOS: Editar + Eliminar -->
+          <div class="eck-relative">
+            <button class="eck-dots-btn" onclick="toggleDots({{ r.id }})" title="Más opciones">
+              <i class="bi bi-three-dots"></i>
+            </button>
+            <div class="eck-dropdown-menu" id="dots-{{ r.id }}">
+              <button class="eck-dropdown-item"
+                      data-bs-toggle="modal" data-bs-target="#modalEditar"
+                      data-id="{{ r.id }}" data-codigo="{{ r.codigo or '' }}"
+                      data-nombre="{{ r.nombre or '' }}" data-marca="{{ r.marca or '' }}"
+                      data-cantidad="{{ r.cantidad or 0 }}" data-costo="{{ r.costo or 0 }}"
+                      data-precio="{{ r.precio or 0 }}"
+                      onclick="toggleDots({{ r.id }})">
+                <i class="bi bi-pencil" style="font-size:13px;"></i> Editar
+              </button>
+              <div class="eck-dropdown-divider"></div>
+              <a class="eck-dropdown-item danger"
+                 href="{{ url_for('main.eliminar', id=r.id) }}"
+                 onclick="return confirm('¿Eliminar este repuesto definitivamente?');">
+                <i class="bi bi-trash" style="font-size:13px;"></i> Eliminar
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </td>
+    </tr>
+
+    {% else %}
+    <tr>
+      <td colspan="6" style="text-align:center; padding:56px 20px;">
+        <div style="color:var(--text-4);">
+          <i class="bi bi-search" style="font-size:28px; display:block; margin-bottom:10px; opacity:.5;"></i>
+          <span style="font-size:14px; font-weight:500;">No se encontraron repuestos con ese criterio.</span>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Paginación -->
+{% if pagination.pages > 1 %}
+<div class="eck-pagination">
+  <a href="{{ url_for('main.inventario', page=pagination.prev_num, q=busqueda, orden=orden_actual) }}"
+     class="eck-page-btn {{ 'disabled' if not pagination.has_prev }}">
+    <i class="bi bi-chevron-left" style="font-size:11px;"></i>
+  </a>
+
+  {% for pg in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+    {% if pg %}
+      <a href="{{ url_for('main.inventario', page=pg, q=busqueda, orden=orden_actual) }}"
+         class="eck-page-btn {{ 'active' if pg == pagination.page }}">{{ pg }}</a>
+    {% else %}
+      <span style="padding:0 4px; color:var(--text-4);">…</span>
+    {% endif %}
+  {% endfor %}
+
+  <a href="{{ url_for('main.inventario', page=pagination.next_num, q=busqueda, orden=orden_actual) }}"
+     class="eck-page-btn {{ 'disabled' if not pagination.has_next }}">
+    <i class="bi bi-chevron-right" style="font-size:11px;"></i>
+  </a>
 </div>
+{% endif %}

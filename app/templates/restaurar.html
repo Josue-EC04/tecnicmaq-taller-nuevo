@@ -1,35 +1,104 @@
 {% extends "base.html" %}
+{% block title %}Restaurar Sistema – ECK Panel{% endblock %}
+{% block breadcrumb %}Sistema / Restaurar{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow border-0">
-                <div class="card-header bg-warning text-dark">
-                    <h4 class="mb-0 fw-bold">📥 Restaurar Copia de Seguridad</h4>
-                </div>
-                <div class="card-body p-4">
-                    <p class="text-muted">
-                        Sube aquí el archivo <code>.json</code> que descargaste anteriormente. 
-                        Esto recuperará tus productos, ventas y usuarios.
-                    </p>
-                    
-                    <form method="POST" enctype="multipart/form-data">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Seleccionar Archivo JSON</label>
-                            <input type="file" name="archivo" class="form-control" accept=".json" required>
-                        </div>
-                        
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                🔄 Restaurar Sistema
-                            </button>
-                            <a href="/" class="btn btn-outline-secondary">Cancelar</a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+<div style="max-width:540px;">
+
+  <div class="eck-page-header">
+    <div>
+      <h2 class="eck-heading">Restaurar Sistema</h2>
+      <p class="eck-subheading">Importa un backup JSON para recuperar todos los datos</p>
     </div>
+    <a href="{{ url_for('main.dashboard') }}" class="btn-eck btn-eck-ghost btn-eck-sm">
+      <i class="bi bi-arrow-left"></i> Volver
+    </a>
+  </div>
+
+  <!-- Info de qué incluye el backup -->
+  <div class="eck-card" style="margin-bottom:16px; padding:18px 22px;">
+    <div style="font-size:12px; font-weight:700; color:var(--text-4); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">
+      El backup JSON contiene:
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-2);">
+        <i class="bi bi-check-circle-fill" style="color:#059669; font-size:14px;"></i>
+        Todos los repuestos con <strong>Código, Nombre, Marca, Stock, Costo y Precio</strong>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-2);">
+        <i class="bi bi-check-circle-fill" style="color:#059669; font-size:14px;"></i>
+        Pedidos de compra (pendientes y comprados)
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-2);">
+        <i class="bi bi-check-circle-fill" style="color:#059669; font-size:14px;"></i>
+        Historial completo de ventas
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-3);">
+        <i class="bi bi-info-circle-fill" style="color:#1D4ED8; font-size:14px;"></i>
+        Si un repuesto ya existe (mismo código), se <strong>actualiza</strong> en vez de duplicarse
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulario de carga -->
+  <div class="eck-card">
+    <form method="POST" enctype="multipart/form-data" style="padding:24px;">
+
+      <label class="eck-label">Archivo de Backup (.json)</label>
+
+      <!-- Zona drag & drop -->
+      <div id="dropZone"
+           onclick="document.getElementById('backupFile').click()"
+           style="border:2px dashed var(--border); border-radius:var(--radius-lg);
+                  padding:40px 20px; text-align:center; cursor:pointer;
+                  background:var(--bg-subtle); transition:all .18s; margin-bottom:16px;">
+        <i class="bi bi-cloud-upload" style="font-size:30px; color:var(--text-4); display:block; margin-bottom:10px;"></i>
+        <div style="font-size:14px; font-weight:600; color:var(--text-2); margin-bottom:4px;">
+          Haz clic para seleccionar el archivo
+        </div>
+        <div style="font-size:12.5px; color:var(--text-4);">
+          Solo archivos .json — del sistema anterior o de este panel
+        </div>
+        <div id="fileName" style="margin-top:12px; font-size:13px; font-weight:600;
+                                   color:var(--red); display:none;"></div>
+      </div>
+
+      <input type="file" name="backup_file" id="backupFile"
+             accept=".json" style="display:none;"
+             onchange="document.getElementById('fileName').textContent = this.files[0]?.name || '';
+                       document.getElementById('fileName').style.display = this.files[0] ? 'block' : 'none';
+                       document.getElementById('dropZone').style.borderColor = this.files[0] ? '#E8001E' : 'var(--border)';">
+
+      <!-- Aviso importante -->
+      <div style="background:#FFF7ED; border:1px solid #FED7AA; border-radius:var(--radius);
+                  padding:12px 16px; margin-bottom:20px; display:flex; gap:10px; align-items:flex-start;">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#D97706; font-size:14px; flex-shrink:0; margin-top:1px;"></i>
+        <div style="font-size:12.5px; color:#92400E; line-height:1.5;">
+          <strong>No borra datos existentes.</strong> La restauración agrega y actualiza registros — no elimina lo que ya tienes en el sistema nuevo.
+        </div>
+      </div>
+
+      <button type="submit" class="btn-eck btn-eck-primary w-100" id="btnRestore"
+              style="justify-content:center; padding:12px;"
+              onclick="if(!document.getElementById('backupFile').files[0]){ alert('Selecciona un archivo .json primero'); return false; }
+                       this.disabled=true; this.innerHTML='<span class=\'spinner-border spinner-border-sm\' style=\'width:.85em;height:.85em;\'></span> Restaurando...'; this.form.submit();">
+        <i class="bi bi-upload"></i> Restaurar desde Backup
+      </button>
+
+    </form>
+  </div>
+
+  <!-- Descarga del nuevo backup -->
+  <div style="margin-top:16px; padding:14px 18px; background:var(--bg-subtle); border:1px solid var(--border);
+              border-radius:var(--radius-lg); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+    <div>
+      <div style="font-size:13px; font-weight:600; color:var(--text-2);">Descargar backup actual</div>
+      <div style="font-size:12px; color:var(--text-4);">Exporta todos los datos actuales de este sistema</div>
+    </div>
+    <a href="{{ url_for('main.descargar_backup') }}" class="btn-eck btn-eck-ghost btn-eck-sm">
+      <i class="bi bi-download"></i> Descargar
+    </a>
+  </div>
+
 </div>
 {% endblock %}
