@@ -24,11 +24,11 @@
   .cam-hero-title { font-size: 22px; font-weight: 700; color: var(--text-1); }
   .cam-hero-sub   { font-size: 13px; color: var(--text-3); margin-top: 2px; }
 
-  /* ── Grid de cámaras ── */
+  /* ── Grid principal de cámaras ── */
   .cam-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 20px;
+    gap: 22px;
     margin-bottom: 28px;
   }
 
@@ -40,242 +40,176 @@
     overflow: hidden;
     box-shadow: var(--shadow);
     transition: var(--transition);
+    display: flex;
+    flex-direction: column;
   }
-  .cam-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+  .cam-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-3px); }
 
   .cam-card-header {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    padding: 14px 18px;
+    padding: 16px 20px;
     display: flex; align-items: center; gap: 10px;
   }
-  .cam-card-header .cam-dot {
-    width: 8px; height: 8px; border-radius: 50%;
+  .cam-dot {
+    width: 9px; height: 9px; border-radius: 50%;
     background: #22c55e;
-    box-shadow: 0 0 6px #22c55e;
-    animation: pulse-green 2s infinite;
+    box-shadow: 0 0 7px #22c55e;
+    animation: pulse-dot 2s infinite;
+    flex-shrink: 0;
   }
-  @keyframes pulse-green {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+  .cam-dot.amber { background: #f59e0b; box-shadow: 0 0 7px #f59e0b; }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(.85); }
   }
-  .cam-card-header .cam-name {
+  .cam-card-name {
     font-size: 13px; font-weight: 600; color: #f1f5f9;
     flex: 1;
   }
-  .cam-card-header .cam-badge {
-    font-size: 10px; font-weight: 600;
-    padding: 2px 8px; border-radius: 20px;
-    background: rgba(56, 189, 248, .15);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, .3);
-    letter-spacing: .5px;
+  .cam-badge {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 9px; border-radius: 20px;
+    letter-spacing: .4px;
   }
+  .cam-badge-blue  { background: rgba(56,189,248,.15); color: #38bdf8; border: 1px solid rgba(56,189,248,.3); }
+  .cam-badge-amber { background: rgba(245,158,11,.15); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
 
-  /* ── Visor / iframe ── */
+  /* ── Visor (área oscura) ── */
   .cam-viewer {
-    position: relative;
-    width: 100%;
-    background: #0f172a;
-    min-height: 260px;
+    background: linear-gradient(160deg, #0f172a 0%, #1a2744 100%);
+    flex: 1;
     display: flex; align-items: center; justify-content: center;
     flex-direction: column;
-    overflow: hidden;
-  }
-  .cam-viewer iframe {
-    width: 100%; height: 420px;
-    border: none;
-    display: block;
-  }
-  .cam-viewer-placeholder {
-    display: flex; flex-direction: column; align-items: center; gap: 12px;
-    padding: 30px;
+    gap: 14px;
+    padding: 32px 24px;
     text-align: center;
+    min-height: 240px;
   }
-  .cam-viewer-placeholder i {
-    font-size: 44px; color: #38bdf8; opacity: .7;
+  .cam-viewer-icon {
+    font-size: 48px;
+    opacity: .75;
+    animation: float-icon 3s ease-in-out infinite;
   }
-  .cam-viewer-placeholder p {
-    color: #94a3b8; font-size: 13px; max-width: 260px; line-height: 1.6;
+  @keyframes float-icon {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-7px); }
   }
-  .cam-viewer-placeholder .cam-btn-open {
-    margin-top: 4px;
+  .cam-viewer p {
+    color: #94a3b8; font-size: 13px;
+    max-width: 270px; line-height: 1.65;
+    margin: 0;
+  }
+  .cam-viewer strong { color: #e2e8f0; }
+
+  /* ── Botón principal de acceso ── */
+  .cam-btn-main {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 10px 20px;
-    background: linear-gradient(135deg, #0ea5e9, #0284c7);
-    color: #fff; border: none; border-radius: var(--radius);
-    font-size: 13px; font-weight: 600;
+    padding: 11px 22px;
+    border: none; border-radius: var(--radius);
+    font-size: 13px; font-weight: 700;
     cursor: pointer; text-decoration: none;
     transition: var(--transition);
-    box-shadow: 0 4px 12px rgba(14, 165, 233, .4);
+    letter-spacing: .2px;
   }
-  .cam-btn-open:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(14, 165, 233, .5);
+  .cam-btn-blue {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(14,165,233,.4);
   }
+  .cam-btn-blue:hover  { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(14,165,233,.55); color: #fff; }
+  .cam-btn-amber {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(245,158,11,.4);
+  }
+  .cam-btn-amber:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(245,158,11,.55); color: #fff; }
 
-  /* ── Info técnica ── */
+  /* ── Info chips ── */
   .cam-info {
-    padding: 14px 18px;
-    border-top: 1px solid var(--border);
-    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 12px 18px;
+    border-top: 1px solid rgba(255,255,255,.06);
+    display: flex; flex-wrap: wrap; gap: 7px;
+    background: #0f172a;
   }
-  .cam-info-chip {
+  .cam-chip {
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; color: var(--text-3);
-    background: var(--bg-subtle);
-    border: 1px solid var(--border);
+    font-size: 10.5px; color: #64748b;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
     border-radius: 20px;
     padding: 3px 10px;
+    font-family: 'JetBrains Mono', monospace;
   }
-  .cam-info-chip i { font-size: 10px; color: var(--text-4); }
+  .cam-chip i { font-size: 10px; color: #475569; }
 
-  /* ── Sección XMEye integrado ── */
-  .cam-xmeye-section {
+  /* ── Sección instrucciones ── */
+  .cam-guide {
     background: #fff;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    overflow: hidden;
     box-shadow: var(--shadow);
+    overflow: hidden;
     margin-bottom: 28px;
   }
-  .cam-xmeye-header {
+  .cam-guide-header {
     background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
     padding: 16px 22px;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px;
-  }
-  .cam-xmeye-header-left {
     display: flex; align-items: center; gap: 12px;
   }
-  .cam-xmeye-header-left i {
-    font-size: 22px; color: #38bdf8;
-  }
-  .cam-xmeye-header-title {
-    font-size: 15px; font-weight: 700; color: #f1f5f9;
-  }
-  .cam-xmeye-header-sub {
-    font-size: 11px; color: #94a3b8; margin-top: 2px;
-  }
-  .cam-xmeye-actions {
-    display: flex; gap: 8px; flex-wrap: wrap;
-  }
-  .cam-btn-xmeye {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 8px 16px;
-    background: #38bdf8;
-    color: #0f172a; border: none; border-radius: var(--radius);
-    font-size: 12px; font-weight: 700;
-    cursor: pointer; text-decoration: none;
-    transition: var(--transition);
-  }
-  .cam-btn-xmeye:hover {
-    background: #7dd3fc;
-    transform: translateY(-1px);
-  }
-  .cam-btn-xmeye-secondary {
-    background: rgba(255,255,255,.1);
-    color: #e2e8f0;
-    border: 1px solid rgba(255,255,255,.2);
-  }
-  .cam-btn-xmeye-secondary:hover {
-    background: rgba(255,255,255,.2);
-    color: #fff;
-  }
+  .cam-guide-header i { font-size: 20px; color: #38bdf8; }
+  .cam-guide-header-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+  .cam-guide-header-sub   { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+  .cam-guide-body { padding: 22px 24px; }
 
-  .cam-iframe-wrapper {
-    position: relative;
-    background: #0f172a;
-  }
-  .cam-iframe-wrapper iframe {
-    width: 100%;
-    height: 620px;
-    border: none;
-    display: block;
-  }
-  .cam-iframe-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 16px; padding: 40px;
-    text-align: center;
-  }
-  .cam-iframe-overlay.hidden { display: none; }
-  .cam-iframe-overlay .big-icon {
-    font-size: 56px; color: #38bdf8; opacity: .8;
-    animation: float 3s ease-in-out infinite;
-  }
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
-  .cam-iframe-overlay h3 { color: #f1f5f9; font-size: 18px; font-weight: 700; }
-  .cam-iframe-overlay p  { color: #94a3b8; font-size: 13px; max-width: 420px; line-height: 1.7; }
-
-  /* ── Alerta de red local ── */
-  .cam-local-alert {
-    background: linear-gradient(135deg, rgba(217,119,6,.08), rgba(217,119,6,.03));
-    border: 1px solid rgba(217,119,6,.25);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    display: flex; align-items: flex-start; gap: 10px;
-    margin-bottom: 20px;
-  }
-  .cam-local-alert i { color: var(--amber); font-size: 16px; flex-shrink: 0; margin-top: 2px; }
-  .cam-local-alert p { color: var(--text-2); font-size: 12.5px; line-height: 1.6; margin: 0; }
-  .cam-local-alert strong { color: var(--amber); }
-
-  /* ── Info chips section ── */
-  .cam-specs-grid {
+  .cam-guide-cols {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
-    padding: 18px 22px;
-    border-top: 1px solid var(--border);
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
   }
-  .cam-spec-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px;
-    background: var(--bg-subtle);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
+  @media (max-width: 700px) {
+    .cam-guide-cols { grid-template-columns: 1fr; }
+    .cam-grid { grid-template-columns: 1fr; }
   }
-  .cam-spec-item i { font-size: 16px; color: #38bdf8; flex-shrink: 0; }
-  .cam-spec-label { font-size: 10px; color: var(--text-4); text-transform: uppercase; letter-spacing: .5px; }
-  .cam-spec-value { font-size: 12px; color: var(--text-1); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
 
-  /* ── Instrucciones ── */
-  .cam-steps {
-    padding: 20px 22px;
-    border-top: 1px solid var(--border);
-  }
-  .cam-steps h6 {
-    font-size: 12px; font-weight: 700; color: var(--text-3);
-    text-transform: uppercase; letter-spacing: .7px;
+  .cam-guide-col-title {
+    font-size: 12px; font-weight: 700;
+    color: var(--text-3); text-transform: uppercase; letter-spacing: .6px;
+    display: flex; align-items: center; gap: 6px;
     margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
   }
-  .cam-step-list {
-    list-style: none; display: flex; flex-direction: column; gap: 8px;
-  }
+  .cam-guide-col-title i { font-size: 14px; color: #38bdf8; }
+  .cam-guide-col-title i.amber { color: #f59e0b; }
+
+  .cam-step-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
   .cam-step-list li {
     display: flex; align-items: flex-start; gap: 10px;
-    font-size: 13px; color: var(--text-2); line-height: 1.5;
+    font-size: 13px; color: var(--text-2); line-height: 1.55;
   }
   .cam-step-num {
     width: 20px; height: 20px; border-radius: 50%;
-    background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-    color: #fff; font-size: 10px; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #fff;
     flex-shrink: 0; margin-top: 1px;
   }
+  .cam-step-num.blue  { background: linear-gradient(135deg, #38bdf8, #0ea5e9); }
+  .cam-step-num.amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
 
-  /* Mobile */
-  @media (max-width: 640px) {
-    .cam-grid { grid-template-columns: 1fr; }
-    .cam-iframe-wrapper iframe { height: 400px; }
-    .cam-xmeye-header { flex-direction: column; align-items: flex-start; }
+  /* ── Alerta info ── */
+  .cam-info-alert {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    font-size: 12.5px; line-height: 1.6;
   }
+  .cam-info-alert i { flex-shrink: 0; margin-top: 1px; }
+  .cam-info-alert p { margin: 0; }
+  .cam-info-alert.info  { background: rgba(56,189,248,.07); border: 1px solid rgba(56,189,248,.2); color: var(--text-2); }
+  .cam-info-alert.info i { color: #38bdf8; }
+  .cam-info-alert.warn  { background: rgba(217,119,6,.07); border: 1px solid rgba(217,119,6,.22); color: var(--text-2); }
+  .cam-info-alert.warn i { color: var(--amber); }
 </style>
 {% endblock %}
 
@@ -289,227 +223,150 @@
     </div>
     <div>
       <div class="cam-hero-title">Cámaras de Seguridad</div>
-      <div class="cam-hero-sub">Monitoreo en tiempo real del taller — 2 cámaras activas</div>
+      <div class="cam-hero-sub">Monitoreo del taller — 2 cámaras activas · Acceso desde cualquier dispositivo</div>
     </div>
   </div>
 
-  <!-- Alerta red local -->
-  <div class="cam-local-alert">
-    <i class="bi bi-wifi"></i>
+  <!-- Alerta info general -->
+  <div class="cam-info-alert info">
+    <i class="bi bi-info-circle-fill"></i>
     <p>
-      <strong>Nota:</strong> La cámara interior del taller tiene IP local <code>192.168.18.23</code> — solo es accesible
-      si tu dispositivo está conectado al WiFi <strong>ESCEL 2.4</strong> del taller.
-      La cámara exterior (iCSee) se puede ver desde cualquier lugar con internet a través del portal XMEye.
+      Las cámaras funcionan a través de aplicaciones en la nube de sus fabricantes. 
+      Haz clic en los botones de cada cámara para acceder directamente a su portal de visualización.
+      Necesitas tener <strong>sesión activa en la app del celular</strong> para poder ver el video.
     </p>
   </div>
 
-  <!-- Grid de cards individuales -->
+  <!-- Grid de cámaras -->
   <div class="cam-grid">
 
-    <!-- Cámara 1: iCSee / XMEye -->
+    <!-- Cámara 1: iCSee -->
     <div class="cam-card">
       <div class="cam-card-header">
         <div class="cam-dot"></div>
-        <span class="cam-name"><i class="bi bi-camera-video me-1"></i> Cámara 1 — iCSee</span>
-        <span class="cam-badge">EN LÍNEA</span>
+        <span class="cam-card-name"><i class="bi bi-camera-video me-1"></i> Cámara 1 — iCSee</span>
+        <span class="cam-badge cam-badge-blue">INTERNET</span>
       </div>
       <div class="cam-viewer">
-        <div class="cam-viewer-placeholder">
-          <i class="bi bi-cloud-check"></i>
-          <p>Esta cámara usa la nube <strong style="color:#38bdf8;">XMEye</strong>. Haz clic para abrirla en el portal web oficial desde cualquier lugar con internet.</p>
-          <a href="https://web.xmeye.net" target="_blank" rel="noopener" class="cam-btn-open">
-            <i class="bi bi-box-arrow-up-right"></i> Abrir en XMEye Web
-          </a>
-        </div>
+        <i class="cam-viewer-icon bi bi-cloud-check" style="color:#38bdf8;"></i>
+        <p>
+          Cámara accesible desde <strong>cualquier lugar con internet</strong>.
+          Usa el portal web oficial de XMEye con tu cuenta de iCSee.
+        </p>
+        <a href="http://www.xmeye.net/web" target="_blank" rel="noopener" class="cam-btn-main cam-btn-blue">
+          <i class="bi bi-box-arrow-up-right"></i> Abrir portal XMEye
+        </a>
       </div>
       <div class="cam-info">
-        <span class="cam-info-chip"><i class="bi bi-cpu"></i> IPG-X4C-WER</span>
-        <span class="cam-info-chip"><i class="bi bi-cloud"></i> Modo RPS (Nube)</span>
-        <span class="cam-info-chip"><i class="bi bi-shield-check"></i> iCSee / XMEye</span>
+        <span class="cam-chip"><i class="bi bi-cpu"></i> IPG-X4C-WER</span>
+        <span class="cam-chip"><i class="bi bi-cloud"></i> Nube RPS</span>
+        <span class="cam-chip"><i class="bi bi-phone"></i> App: iCSee</span>
       </div>
     </div>
 
-    <!-- Cámara 2: O-KAM Pro / Local -->
+    <!-- Cámara 2: O-KAM Pro -->
     <div class="cam-card">
       <div class="cam-card-header">
-        <div class="cam-dot" style="background:#f59e0b; box-shadow:0 0 6px #f59e0b;"></div>
-        <span class="cam-name"><i class="bi bi-camera-video me-1"></i> Cámara 2 — Interior Taller</span>
-        <span class="cam-badge" style="background:rgba(245,158,11,.15); color:#f59e0b; border-color:rgba(245,158,11,.3);">LAN LOCAL</span>
+        <div class="cam-dot amber"></div>
+        <span class="cam-card-name"><i class="bi bi-camera-video me-1"></i> Cámara 2 — Interior Taller</span>
+        <span class="cam-badge cam-badge-amber">LAN / APP</span>
       </div>
       <div class="cam-viewer">
-        <div class="cam-viewer-placeholder">
-          <i class="bi bi-house-door" style="color:#f59e0b;"></i>
-          <p>Esta cámara solo es accesible dentro del taller (red WiFi <strong style="color:#f59e0b;">ESCEL 2.4</strong>).
-          Usa la app O-KAM Pro desde tu celular para verla.</p>
-          <a href="https://play.google.com/store/apps/details?id=com.okcam.okam" target="_blank" rel="noopener"
-             class="cam-btn-open" style="background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 12px rgba(245,158,11,.4);">
-            <i class="bi bi-phone"></i> Abrir O-KAM Pro
-          </a>
-        </div>
+        <i class="cam-viewer-icon bi bi-house-door" style="color:#f59e0b;"></i>
+        <p>
+          Accede a esta cámara desde el celular con la app <strong>O-KAM Pro</strong>.
+          Funciona dentro y fuera del taller (requiere tu cuenta O-KAM activa).
+        </p>
+        <a href="https://play.google.com/store/apps/details?id=com.okampro.oksmart"
+           target="_blank" rel="noopener" class="cam-btn-main cam-btn-amber">
+          <i class="bi bi-google-play"></i> Descargar O-KAM Pro
+        </a>
       </div>
       <div class="cam-info">
-        <span class="cam-info-chip"><i class="bi bi-hdd-network"></i> 192.168.18.23</span>
-        <span class="cam-info-chip"><i class="bi bi-wifi"></i> ESCEL 2.4</span>
-        <span class="cam-info-chip"><i class="bi bi-tag"></i> VE4864929GPEO</span>
+        <span class="cam-chip"><i class="bi bi-hdd-network"></i> 192.168.18.23</span>
+        <span class="cam-chip"><i class="bi bi-wifi"></i> ESCEL 2.4</span>
+        <span class="cam-chip"><i class="bi bi-tag"></i> VE4864929GPEO</span>
       </div>
     </div>
 
   </div>
 
-  <!-- Panel principal XMEye integrado -->
-  <div class="cam-xmeye-section">
-    <div class="cam-xmeye-header">
-      <div class="cam-xmeye-header-left">
-        <i class="bi bi-display"></i>
-        <div>
-          <div class="cam-xmeye-header-title">Portal XMEye — Visor Web</div>
-          <div class="cam-xmeye-header-sub">Acceso desde cualquier lugar con internet · Cámara iCSee</div>
-        </div>
-      </div>
-      <div class="cam-xmeye-actions">
-        <a href="https://web.xmeye.net" target="_blank" rel="noopener" class="cam-btn-xmeye">
-          <i class="bi bi-box-arrow-up-right"></i> Abrir en pestaña nueva
-        </a>
-        <button onclick="loadXMEye()" class="cam-btn-xmeye cam-btn-xmeye-secondary">
-          <i class="bi bi-play-circle"></i> Cargar aquí
-        </button>
+  <!-- Guía de acceso -->
+  <div class="cam-guide">
+    <div class="cam-guide-header">
+      <i class="bi bi-journal-text"></i>
+      <div>
+        <div class="cam-guide-header-title">Guía de acceso paso a paso</div>
+        <div class="cam-guide-header-sub">Instrucciones para cada cámara · Para cualquier empleado</div>
       </div>
     </div>
 
-    <!-- Iframe wrapper -->
-    <div class="cam-iframe-wrapper">
-      <div class="cam-iframe-overlay" id="xmeyeOverlay">
-        <i class="bi bi-camera-video big-icon"></i>
-        <h3>Visor XMEye</h3>
+    <div class="cam-guide-body">
+
+      <!-- Alerta red local -->
+      <div class="cam-info-alert warn">
+        <i class="bi bi-exclamation-triangle-fill"></i>
         <p>
-          Haz clic en <strong>"Cargar aquí"</strong> para intentar abrir el portal XMEye dentro de este panel,
-          o en <strong>"Abrir en pestaña nueva"</strong> para una experiencia completa sin restricciones de navegador.
-        </p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-          <button onclick="loadXMEye()" class="cam-btn-open" style="margin-top:0;">
-            <i class="bi bi-play-circle"></i> Cargar visor aquí
-          </button>
-          <a href="https://web.xmeye.net" target="_blank" rel="noopener"
-             class="cam-btn-open" style="margin-top:0; background: rgba(255,255,255,.12); color:#e2e8f0; box-shadow:none;">
-            <i class="bi bi-box-arrow-up-right"></i> Nueva pestaña
-          </a>
-        </div>
-        <p id="xmeyeNote" style="display:none; color:#f87171; font-size:12px; margin-top:8px;">
-          <i class="bi bi-exclamation-triangle me-1"></i>
-          El portal bloqueó la carga en iframe. Por favor usa <strong>"Abrir en pestaña nueva"</strong>.
+          La <strong>IP local 192.168.18.23</strong> de la Cámara 2 solo funciona desde dispositivos 
+          conectados al WiFi <strong>ESCEL 2.4</strong> del taller. Fuera del taller, usa la app O-KAM Pro.
         </p>
       </div>
-      <iframe id="xmeyeFrame" src="about:blank" title="XMEye Web"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-              style="display:none;">
-      </iframe>
-    </div>
 
-    <!-- Especificaciones técnicas -->
-    <div class="cam-specs-grid">
-      <div class="cam-spec-item">
-        <i class="bi bi-upc-scan"></i>
-        <div>
-          <div class="cam-spec-label">Número de serie</div>
-          <div class="cam-spec-value">033ce6d7…6a09</div>
-        </div>
-      </div>
-      <div class="cam-spec-item">
-        <i class="bi bi-cpu"></i>
-        <div>
-          <div class="cam-spec-label">Modelo</div>
-          <div class="cam-spec-value">IPG-X4C-WER</div>
-        </div>
-      </div>
-      <div class="cam-spec-item">
-        <i class="bi bi-cloud-arrow-up"></i>
-        <div>
-          <div class="cam-spec-label">Modo de red</div>
-          <div class="cam-spec-value">RPS (Nube P2P)</div>
-        </div>
-      </div>
-      <div class="cam-spec-item">
-        <i class="bi bi-calendar3"></i>
-        <div>
-          <div class="cam-spec-label">Firmware</div>
-          <div class="cam-spec-value">V5.00.R02</div>
-        </div>
-      </div>
-    </div>
+      <div class="cam-guide-cols">
 
-    <!-- Instrucciones de acceso -->
-    <div class="cam-steps">
-      <h6><i class="bi bi-list-ol me-1"></i> Cómo acceder a las cámaras</h6>
-      <ul class="cam-step-list">
-        <li>
-          <span class="cam-step-num">1</span>
-          <span>Haz clic en <strong>"Abrir en pestaña nueva"</strong> o <strong>"Cargar aquí"</strong> para abrir el portal XMEye.</span>
-        </li>
-        <li>
-          <span class="cam-step-num">2</span>
-          <span>Inicia sesión con tu cuenta de iCSee/XMEye. Si no tienes cuenta, crea una en la misma app iCSee del celular.</span>
-        </li>
-        <li>
-          <span class="cam-step-num">3</span>
-          <span>Tus cámaras aparecerán automáticamente asociadas a tu cuenta. Haz clic en el ícono de reproducción para ver el live.</span>
-        </li>
-        <li>
-          <span class="cam-step-num">4</span>
-          <span>Para la <strong>cámara interior del taller</strong>, usa la app O-KAM Pro desde el celular (solo funciona en la red WiFi del taller).</span>
-        </li>
-      </ul>
+        <!-- Instrucciones Cámara 1 -->
+        <div>
+          <div class="cam-guide-col-title">
+            <i class="bi bi-camera-video"></i> Cámara 1 — iCSee / XMEye
+          </div>
+          <ul class="cam-step-list">
+            <li>
+              <span class="cam-step-num blue">1</span>
+              <span>Haz clic en <strong>"Abrir portal XMEye"</strong> arriba o entra a <code>xmeye.net/web</code> desde tu navegador.</span>
+            </li>
+            <li>
+              <span class="cam-step-num blue">2</span>
+              <span>Inicia sesión con tu <strong>cuenta de iCSee</strong> (la misma que usas en el celular). Si no tienes cuenta, créala en la app iCSee.</span>
+            </li>
+            <li>
+              <span class="cam-step-num blue">3</span>
+              <span>Tu cámara aparecerá en el panel. Haz clic en el ícono <strong>▶ Play</strong> para ver el video en vivo.</span>
+            </li>
+            <li>
+              <span class="cam-step-num blue">4</span>
+              <span>Si el portal pide <strong>Número de Serie</strong>, usa: <code>033ce6d7…6a09</code> (ver en la app iCSee).</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Instrucciones Cámara 2 -->
+        <div>
+          <div class="cam-guide-col-title">
+            <i class="bi bi-house-door amber"></i> Cámara 2 — O-KAM Pro
+          </div>
+          <ul class="cam-step-list">
+            <li>
+              <span class="cam-step-num amber">1</span>
+              <span>Descarga la app <strong>O-KAM Pro</strong> desde Google Play o App Store en tu celular.</span>
+            </li>
+            <li>
+              <span class="cam-step-num amber">2</span>
+              <span>Inicia sesión con tu <strong>cuenta O-KAM</strong>. La cámara del taller ya debe estar vinculada a la cuenta.</span>
+            </li>
+            <li>
+              <span class="cam-step-num amber">3</span>
+              <span>Selecciona <strong>"Interior taller"</strong> en la lista de cámaras y toca el botón de reproducción.</span>
+            </li>
+            <li>
+              <span class="cam-step-num amber">4</span>
+              <span>Si estás en el taller (WiFi <strong>ESCEL 2.4</strong>), la conexión será más rápida por red local.</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
     </div>
   </div>
 
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-let iframeLoaded = false;
-
-function loadXMEye() {
-  if (iframeLoaded) return;
-  iframeLoaded = true;
-
-  const overlay  = document.getElementById('xmeyeOverlay');
-  const frame    = document.getElementById('xmeyeFrame');
-  const note     = document.getElementById('xmeyeNote');
-
-  frame.style.display = 'block';
-  frame.src = 'https://web.xmeye.net';
-
-  // Detectar si el iframe fue bloqueado por X-Frame-Options
-  let checkTimer = setTimeout(() => {
-    try {
-      // Si el src cambia o hay error de acceso, mostrar advertencia
-      const href = frame.contentWindow.location.href;
-      // Si llegamos aquí sin error, está cargando
-      overlay.classList.add('hidden');
-    } catch (e) {
-      // Cross-origin o bloqueado — mostrar nota de error
-      frame.style.display = 'none';
-      note.style.display  = 'block';
-    }
-  }, 3000);
-
-  frame.addEventListener('load', () => {
-    clearTimeout(checkTimer);
-    try {
-      const href = frame.contentWindow.location.href;
-      overlay.classList.add('hidden');
-    } catch (e) {
-      // Bloqueado por política del sitio
-      frame.style.display = 'none';
-      note.style.display  = 'block';
-    }
-  });
-
-  frame.addEventListener('error', () => {
-    clearTimeout(checkTimer);
-    frame.style.display = 'none';
-    note.style.display  = 'block';
-  });
-}
-</script>
 {% endblock %}
