@@ -158,6 +158,11 @@ def dashboard():
 
 # --- REEMPLAZA ESTA FUNCIÓN EN routes.py ---
 
+@main.route('/camaras')
+@login_required
+def camaras():
+    return render_template('camaras.html')
+
 @main.route('/inventario')
 @login_required
 def inventario():
