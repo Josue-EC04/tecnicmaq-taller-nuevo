@@ -168,32 +168,7 @@
 <div id="sidebarOverlay" onclick="toggleSidebar()"
      style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1025;"></div>
 
-<!-- ════════ CHATBOT FAB ════════ -->
-<div id="eck-chat-fab">
-  <div class="eck-chat-bubble" id="eckChatBubble">
-    <div class="eck-chat-header">
-      <div>
-        <div class="eck-chat-title">Asistente IA</div>
-        <div class="eck-chat-status eck-chat-online">En línea</div>
-      </div>
-      <button onclick="toggleChat()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    <div class="eck-chat-messages" id="eckMessages">
-      <div class="eck-msg eck-msg-bot">Hola, soy el asistente de Tecnicmaq. Puedo ayudarte con consultas de stock, repuestos o reportes rápidos.</div>
-    </div>
-    <div class="eck-chat-input-row">
-      <input type="text" id="eckChatInput" class="eck-input" style="border-radius:8px; font-size:13px; padding:8px 12px;" placeholder="Escribe tu consulta...">
-      <button onclick="eckSend()" class="btn-eck btn-eck-primary" style="padding:8px 14px; border-radius:8px;">
-        <i class="bi bi-send-fill" style="font-size:12px;"></i>
-      </button>
-    </div>
-  </div>
-  <button class="eck-chat-fab-btn" onclick="toggleChat()" id="chatFabBtn" title="Asistente IA">
-    <i class="bi bi-robot" id="chatFabIcon"></i>
-  </button>
-</div>
+
 
 {% endif %}
 
@@ -207,65 +182,7 @@ function toggleSidebar() {
   ov.style.display = sb.classList.contains('open') ? 'block' : 'none';
 }
 
-// ── CHATBOT ──
-let chatOpen = false;
-function toggleChat() {
-  const bubble = document.getElementById('eckChatBubble');
-  const icon   = document.getElementById('chatFabIcon');
-  chatOpen = !chatOpen;
-  if (chatOpen) {
-    bubble.style.display = 'block';
-    setTimeout(() => bubble.classList.add('open'), 10);
-    icon.className = 'bi bi-x-lg';
-    document.getElementById('eckChatInput').focus();
-  } else {
-    bubble.classList.remove('open');
-    icon.className = 'bi bi-robot';
-    setTimeout(() => { bubble.style.display = 'none'; }, 220);
-  }
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-  const inp = document.getElementById('eckChatInput');
-  if (inp) inp.addEventListener('keypress', e => { if(e.key === 'Enter') eckSend(); });
-});
-
-function eckSend() {
-  const inp = document.getElementById('eckChatInput');
-  const msg = inp.value.trim();
-  if (!msg) return;
-  eckAddMsg(msg, 'user');
-  inp.value = '';
-  const lid = eckAddLoading();
-  fetch('/chatbot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mensaje:msg}) })
-    .then(r => r.json())
-    .then(d => { eckRemoveLoading(lid); eckAddMsg(d.respuesta, 'bot'); })
-    .catch(() => { eckRemoveLoading(lid); eckAddMsg('Error de conexión.', 'bot'); });
-}
-
-function eckAddMsg(text, type) {
-  const div = document.createElement('div');
-  div.className = `eck-msg eck-msg-${type}`;
-  div.innerHTML = text.replace(/\n/g, '<br>');
-  const c = document.getElementById('eckMessages');
-  c.appendChild(div);
-  c.scrollTop = c.scrollHeight;
-}
-
-function eckAddLoading() {
-  const id = 'ld-' + Date.now();
-  const d = document.createElement('div');
-  d.id = id; d.className = 'eck-msg eck-msg-bot';
-  d.style.color = 'var(--text-4)';
-  d.innerHTML = '<span class="spinner-grow spinner-grow-sm" style="width:.45rem;height:.45rem;"></span> Escribiendo...';
-  document.getElementById('eckMessages').appendChild(d);
-  return id;
-}
-
-function eckRemoveLoading(id) {
-  const el = document.getElementById(id);
-  if(el) el.remove();
-}
 
 // ── PREVENIR DOBLE ENVÍO ──
 document.addEventListener('DOMContentLoaded', () => {

@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import io 
 import gc
-import google.generativeai as genai
+
 from datetime import datetime, date
 from collections import defaultdict
 from sqlalchemy import func, desc
@@ -911,46 +911,4 @@ def eliminar_tienda(id):
     flash('Tienda eliminada del directorio.', 'warning')
     return redirect(url_for('main.directorio'))
 
-
-# ── CHATBOT ────────────────────────────────────────────────────────────────
-
-@main.route('/chatbot', methods=['POST'])
-@login_required
-def chatbot_responde():
-    data = request.get_json()
-    mensaje_usuario = data.get('mensaje', '')
-    historial = session.get('historial_chat', [])
-    
-    # ---------------------------------------------------------
-    # ⚠️ PEGA AQUÍ TU API KEY DIRECTAMENTE (Dentro de las comillas)
-    # Si no tienes una, créala gratis en: https://aistudio.google.com/app/apikey
-    api_key = "AIzaSyC0KJXME7qt-7J2bkcRP8q3jRy3ODxgJd8" 
-    # ---------------------------------------------------------
-
-    if "TU_API_KEY" in api_key:
-        return jsonify({'respuesta': '⚠️ Error: Necesitas poner tu API Key real en el código (routes.py).'})
-
-    # Datos básicos para que la IA no alucine
-    contexto_negocio = "Eres el asistente de 'Tecnicmaq'. Responde en español, sé breve y útil."
-
-    try:
-        genai.configure(api_key=api_key)
-        # Usamos el modelo más estable actualmente
-        model = genai.GenerativeModel('gemini-pro')
-        
-        chat = model.start_chat(history=[])
-        response = chat.send_message(f"{contexto_negocio}. Usuario dice: {mensaje_usuario}")
-        
-        respuesta = response.text.strip()
-        
-        # Guardar historial
-        historial.append({"role": "Usuario", "text": mensaje_usuario})
-        historial.append({"role": "Bot", "text": respuesta})
-        session['historial_chat'] = historial[-6:]
-        
-        return jsonify({'respuesta': respuesta})
-
-    except Exception as e:
-        # Esto imprimirá el error REAL en tu terminal negra para que sepamos qué pasa
-        print(f"\n🔥 ERROR EXACTO DE LA IA: {str(e)}\n")
-        return jsonify({'respuesta': "Lo siento, hubo un error de conexión con Google. Revisa la terminal."})
+
