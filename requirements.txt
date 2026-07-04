@@ -4,6 +4,6 @@ Flask-SQLAlchemy==3.1.1
 psycopg2-binary==2.9.11
 pandas==2.3.3
 openpyxl==3.1.5
-
+requests==2.31.0
 python-dotenv==1.2.1
 gunicorn==23.0.0
