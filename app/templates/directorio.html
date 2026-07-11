@@ -57,6 +57,11 @@
       <option value="{{ c }}" {{ 'selected' if categ_f == c }}>{{ c }}</option>
       {% endfor %}
     </select>
+    <div style="position:relative; width:130px;">
+      <i class="bi bi-geo" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-4); font-size:13px;"></i>
+      <input type="number" name="distancia" value="{{ distancia_max }}" class="eck-input"
+             style="padding-left:34px;" placeholder="Distancia (km)" min="1">
+    </div>
     <button type="submit" class="btn-eck btn-eck-primary btn-eck-sm">Buscar</button>
   </form>
   <a href="{{ url_for('main.directorio', favoritas='1') }}"
@@ -105,6 +110,7 @@
             <i class="bi bi-geo-alt" style="font-size:10px; color:var(--red);"></i>
             {{ t.direccion }}
             {% if t.referencia %}· <em>{{ t.referencia }}</em>{% endif %}
+            {% if t.distancia_calculada %}· <strong style="color:var(--text-2);">{{ t.distancia_calculada }} km</strong>{% endif %}
           </div>
         </div>
         <!-- Acciones rápidas -->
@@ -418,9 +424,9 @@
 
 {% block extra_scripts %}
 <script>
-// ── Coordenadas del taller (San Agustín de Cajas) ──
-const TALLER_LAT = -12.006110372584173;
-const TALLER_LNG = -75.24381153853837;
+// ── Coordenadas del taller (Dinámicas) ──
+const TALLER_LAT = {{ conf.taller_latitud }};
+const TALLER_LNG = {{ conf.taller_longitud }};
 
 // ── Ícono del marcador taller ──
 const iconoTaller = L.divIcon({
@@ -456,9 +462,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 L.marker([TALLER_LAT, TALLER_LNG], { icon: iconoTaller })
   .addTo(mapa)
   .bindPopup(`<div class="map-popup">
-    <div class="map-popup-title">🔧 Tecnicmaq ECK</div>
-    <div class="map-popup-addr">San Agustín de Cajas, Huancayo</div>
-    <div style="font-size:11px; color:#6B7280;">← Ubicación del taller (punto de partida)</div>
+    <div class="map-popup-title">🔧 {{ conf.taller_nombre }}</div>
+    <div class="map-popup-addr">Punto de partida</div>
+    <div style="font-size:11px; color:#6B7280;">← Ubicación central</div>
   </div>`)
   .openPopup();
 

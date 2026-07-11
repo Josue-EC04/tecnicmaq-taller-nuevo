@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "run.py"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/backup?token=tecnicmaq_cron_2026",
+      "schedule": "0 0 * * *"
+    }
   ]
 }

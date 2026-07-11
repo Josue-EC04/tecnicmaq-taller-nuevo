@@ -10,6 +10,14 @@ class Usuario(UserMixin, db.Model):
     password = db.Column(db.String(500), nullable=False)
     nombre = db.Column(db.String(150), nullable=True)
 
+class Configuracion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    taller_nombre = db.Column(db.String(150), default="Tecnicmaq ECK")
+    taller_latitud = db.Column(db.Float, default=-12.006110)
+    taller_longitud = db.Column(db.Float, default=-75.243811)
+    alerta_stock_minimo = db.Column(db.Integer, default=5)
+
+
 class Repuesto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(50), unique=True, nullable=False)

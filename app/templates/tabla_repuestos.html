@@ -70,9 +70,9 @@
 
       <!-- Stock -->
       <td class="text-center">
-        {% if r.cantidad <= 2 %}
+        {% if r.cantidad < conf.alerta_stock_minimo %}
           <span class="eck-stock-low">{{ r.cantidad }} uds.</span>
-        {% elif r.cantidad < 5 %}
+        {% elif r.cantidad < (conf.alerta_stock_minimo + 5) %}
           <span class="eck-stock-mid">{{ r.cantidad }} uds.</span>
         {% else %}
           <span class="eck-stock-ok">{{ r.cantidad }} uds.</span>

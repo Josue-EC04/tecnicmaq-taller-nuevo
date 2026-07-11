@@ -17,7 +17,8 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 from flask_login import login_user, logout_user, login_required, current_user
 
-from .models import Repuesto, PedidoCompra, Usuario, Venta, Residuo, TiendaProveedor, db
+from .models import Repuesto, PedidoCompra, Usuario, Venta, Residuo, TiendaProveedor, Configuracion, db
+import math
 
 main = Blueprint('main', __name__)
 
@@ -101,6 +102,15 @@ def extraer_coordenadas_de_url(url):
 
     return None, None
 
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371.0
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
+
 # --- RUTAS PRINCIPALES ---
 
 @main.route('/')
@@ -108,8 +118,14 @@ def dashboard():
     if not current_user.is_authenticated:
         return redirect(url_for('main.login'))
 
+    conf = Configuracion.query.first()
+    if not conf:
+        conf = Configuracion()
+        db.session.add(conf)
+        db.session.commit()
+
     total_tipos    = Repuesto.query.count()
-    alertas_stock  = Repuesto.query.filter(Repuesto.cantidad < 5).count()
+    alertas_stock  = Repuesto.query.filter(Repuesto.cantidad < conf.alerta_stock_minimo).count()
     total_pedidos  = PedidoCompra.query.filter_by(estado='Pendiente').count()
     total_valor    = db.session.query(func.sum(Repuesto.costo * Repuesto.cantidad)).scalar() or 0
 
@@ -139,8 +155,8 @@ def dashboard():
         dias_labels.append(d.strftime('%d/%m'))
         dias_data.append(round(float(total_dia), 2))
 
-    # Alertas de stock critico (cantidad < 5)
-    alertas_lista = Repuesto.query.filter(Repuesto.cantidad < 5).order_by(Repuesto.cantidad.asc()).limit(6).all()
+    # Alertas de stock critico
+    alertas_lista = Repuesto.query.filter(Repuesto.cantidad < conf.alerta_stock_minimo).order_by(Repuesto.cantidad.asc()).limit(6).all()
 
     # Pedidos pendientes recientes
     pedidos_recientes = PedidoCompra.query.filter_by(estado='Pendiente').order_by(PedidoCompra.fecha_creacion.desc()).limit(5).all()
@@ -195,10 +211,12 @@ def inventario():
             mensaje_sugerencia = f"Quizás buscabas '{posibles[0]}':"
             repuestos = Repuesto.query.filter(Repuesto.nombre.ilike(f'%{posibles[0]}%')).all()
 
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('tabla_repuestos.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia)
+    conf = Configuracion.query.first()
 
-    return render_template('inventario.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render_template('tabla_repuestos.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia, conf=conf)
+
+    return render_template('inventario.html', repuestos=repuestos, pagination=pagination, busqueda=busqueda, orden_actual=orden, mensaje_sugerencia=mensaje_sugerencia, conf=conf)
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
@@ -518,6 +536,54 @@ def importar_excel():
 @login_required
 def deshacer_carga(): return redirect(url_for('main.inventario'))
 
+@main.route('/api/cron/backup', methods=['GET', 'POST'])
+def cron_backup():
+    token = request.args.get('token')
+    # Validar token simple para seguridad
+    if token != os.environ.get('CRON_SECRET', 'tecnicmaq_cron_2026'):
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        # Generar data
+        repuestos = [{'id': r.id, 'codigo': r.codigo, 'nombre': r.nombre, 'marca': r.marca or '', 'cantidad': r.cantidad, 'costo': float(r.costo or 0), 'precio': float(r.precio or 0), 'imagen_filename': r.imagen_filename or ''} for r in Repuesto.query.all()]
+        pedidos = [{'id': p.id, 'repuesto_id': p.repuesto_id, 'cantidad_sugerida': p.cantidad_sugerida, 'estado': p.estado, 'proveedor_nombre': p.proveedor_nombre or '', 'proveedor_telefono': p.proveedor_telefono or '', 'fecha_pedido': p.fecha_creacion.isoformat() if p.fecha_creacion else None} for p in PedidoCompra.query.all()]
+        ventas = []
+        for v in Venta.query.all():
+            r = Repuesto.query.filter_by(codigo=v.repuesto_codigo).first() if v.repuesto_codigo else None
+            ventas.append({'id': v.id, 'repuesto_id': r.id if r else None, 'repuesto_nombre': v.repuesto_nombre, 'repuesto_codigo': v.repuesto_codigo or '', 'cantidad': v.cantidad, 'precio_unitario': float(v.precio_unitario or 0), 'costo_unitario': float(v.costo_unitario or 0), 'ganancia_total': float(v.ganancia_total or 0), 'fecha': v.fecha.isoformat() if v.fecha else None})
+        residuos = [{'id': r.id, 'nombre': r.nombre, 'categoria': r.categoria, 'cantidad': r.cantidad, 'peso_kg': r.peso_kg, 'origen': r.origen, 'estado': r.estado, 'destino': r.destino, 'destino_detalle': r.destino_detalle, 'ganancia_chatarra': r.ganancia_chatarra, 'fecha_registro': r.fecha_registro.isoformat() if r.fecha_registro else None, 'fecha_derivacion': r.fecha_derivacion.isoformat() if r.fecha_derivacion else None} for r in Residuo.query.all()]
+        tiendas = [{'id': t.id, 'nombre': t.nombre, 'direccion': t.direccion, 'referencia': t.referencia, 'telefono': t.telefono, 'whatsapp': t.whatsapp, 'horario': t.horario, 'categorias_repuestos': t.categorias_repuestos, 'notas': t.notas, 'google_maps_link': t.google_maps_link, 'latitud': t.latitud, 'longitud': t.longitud, 'es_favorita': t.es_favorita, 'fecha_registro': t.fecha_registro.isoformat() if t.fecha_registro else None} for t in TiendaProveedor.query.all()]
+
+        backup_data = {
+            'version': '2.0',
+            'sistema': 'ECK Panel - Tecnicmaq',
+            'fecha': datetime.now().isoformat(),
+            'repuestos': repuestos, 'pedidos': pedidos, 'ventas': ventas, 'residuos': residuos, 'tiendas': tiendas
+        }
+        json_bytes = json.dumps(backup_data, ensure_ascii=False, indent=2).encode('utf-8')
+
+        supabase_url = os.environ.get('SUPABASE_URL')
+        supabase_key = os.environ.get('SUPABASE_KEY')
+        
+        if supabase_url and supabase_key:
+            filename = f"backup_tecnicmaq_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+            url = f"{supabase_url.rstrip('/')}/storage/v1/object/backups/{filename}"
+            headers = {
+                "Authorization": f"Bearer {supabase_key}",
+                "apikey": supabase_key,
+                "Content-Type": "application/json"
+            }
+            resp = requests.post(url, data=json_bytes, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                return jsonify({'status': 'ok', 'message': f'Backup {filename} subido a Supabase'}), 200
+            else:
+                return jsonify({'error': f'Error Supabase: {resp.status_code} - {resp.text}'}), 500
+        else:
+            return jsonify({'error': 'Credenciales de Supabase no configuradas'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @main.route('/backup')
 @login_required
 def descargar_backup():
@@ -563,6 +629,42 @@ def descargar_backup():
                 'fecha':            v.fecha.isoformat() if v.fecha else None,
             })
 
+        residuos = []
+        for r in Residuo.query.all():
+            residuos.append({
+                'id': r.id,
+                'nombre': r.nombre,
+                'categoria': r.categoria,
+                'cantidad': r.cantidad,
+                'peso_kg': r.peso_kg,
+                'origen': r.origen,
+                'estado': r.estado,
+                'destino': r.destino,
+                'destino_detalle': r.destino_detalle,
+                'ganancia_chatarra': r.ganancia_chatarra,
+                'fecha_registro': r.fecha_registro.isoformat() if r.fecha_registro else None,
+                'fecha_derivacion': r.fecha_derivacion.isoformat() if r.fecha_derivacion else None,
+            })
+            
+        tiendas = []
+        for t in TiendaProveedor.query.all():
+            tiendas.append({
+                'id': t.id,
+                'nombre': t.nombre,
+                'direccion': t.direccion,
+                'referencia': t.referencia,
+                'telefono': t.telefono,
+                'whatsapp': t.whatsapp,
+                'horario': t.horario,
+                'categorias_repuestos': t.categorias_repuestos,
+                'notas': t.notas,
+                'google_maps_link': t.google_maps_link,
+                'latitud': t.latitud,
+                'longitud': t.longitud,
+                'es_favorita': t.es_favorita,
+                'fecha_registro': t.fecha_registro.isoformat() if t.fecha_registro else None,
+            })
+
         backup_data = {
             'version':    '2.0',
             'sistema':    'ECK Panel - Tecnicmaq',
@@ -570,6 +672,8 @@ def descargar_backup():
             'repuestos':  repuestos,
             'pedidos':    pedidos,
             'ventas':     ventas,
+            'residuos':   residuos,
+            'tiendas':    tiendas,
         }
 
         json_bytes = json.dumps(backup_data, ensure_ascii=False, indent=2).encode('utf-8')
@@ -601,6 +705,8 @@ def subir_backup():
         repuestos_data = data.get('repuestos', [])
         pedidos_data   = data.get('pedidos',   [])
         ventas_data    = data.get('ventas',     [])
+        residuos_data  = data.get('residuos',   [])
+        tiendas_data   = data.get('tiendas',    [])
 
         # --- REPUESTOS ---
         rep_new = 0; rep_upd = 0
@@ -684,9 +790,61 @@ def subir_backup():
             db.session.add(v)
             ven_new += 1
 
+        # --- RESIDUOS ---
+        res_new = 0
+        residuos_existentes = {r.id for r in Residuo.query.all()}
+        for rd in residuos_data:
+            if rd.get('id') in residuos_existentes:
+                continue
+            r = Residuo(
+                nombre=rd.get('nombre', ''),
+                categoria=rd.get('categoria', 'Otro'),
+                cantidad=rd.get('cantidad', 1),
+                peso_kg=rd.get('peso_kg'),
+                origen=rd.get('origen'),
+                estado=rd.get('estado', 'Acumulado'),
+                destino=rd.get('destino'),
+                destino_detalle=rd.get('destino_detalle'),
+                ganancia_chatarra=rd.get('ganancia_chatarra', 0.0)
+            )
+            if rd.get('fecha_registro'):
+                try: r.fecha_registro = datetime.fromisoformat(rd['fecha_registro'])
+                except: pass
+            if rd.get('fecha_derivacion'):
+                try: r.fecha_derivacion = datetime.fromisoformat(rd['fecha_derivacion'])
+                except: pass
+            db.session.add(r)
+            res_new += 1
+
+        # --- TIENDAS ---
+        tie_new = 0
+        tiendas_existentes = {t.id for t in TiendaProveedor.query.all()}
+        for td in tiendas_data:
+            if td.get('id') in tiendas_existentes:
+                continue
+            t = TiendaProveedor(
+                nombre=td.get('nombre', ''),
+                direccion=td.get('direccion', ''),
+                referencia=td.get('referencia'),
+                telefono=td.get('telefono'),
+                whatsapp=td.get('whatsapp'),
+                horario=td.get('horario'),
+                categorias_repuestos=td.get('categorias_repuestos'),
+                notas=td.get('notas'),
+                google_maps_link=td.get('google_maps_link'),
+                latitud=td.get('latitud'),
+                longitud=td.get('longitud'),
+                es_favorita=td.get('es_favorita', False)
+            )
+            if td.get('fecha_registro'):
+                try: t.fecha_registro = datetime.fromisoformat(td['fecha_registro'])
+                except: pass
+            db.session.add(t)
+            tie_new += 1
+
         db.session.commit()
 
-        msg = f'Backup restaurado: {rep_new} repuestos nuevos, {rep_upd} actualizados, {ped_new} pedidos, {ven_new} ventas importadas.'
+        msg = f'Backup restaurado: {rep_new} repuestos nuevos, {rep_upd} actualizados, {ped_new} pedidos, {ven_new} ventas, {res_new} residuos y {tie_new} tiendas importadas.'
         flash(msg, 'success')
         return redirect(url_for('main.inventario'))
 
@@ -784,6 +942,13 @@ def directorio():
     buscar    = request.args.get('q', '').strip()
     categ_f   = request.args.get('categoria', '')
     favoritas = request.args.get('favoritas', '')
+    distancia_max = request.args.get('distancia', '')
+
+    conf = Configuracion.query.first()
+    if not conf:
+        conf = Configuracion()
+        db.session.add(conf)
+        db.session.commit()
 
     query = TiendaProveedor.query
     if favoritas:
@@ -798,27 +963,72 @@ def directorio():
         )
     tiendas = query.order_by(TiendaProveedor.es_favorita.desc(), TiendaProveedor.nombre.asc()).all()
 
-    # Serializar para el mapa Leaflet
+    if distancia_max and distancia_max.isdigit():
+        max_km = float(distancia_max)
+        tiendas_filtradas = []
+        for t in tiendas:
+            if t.latitud and t.longitud:
+                dist = haversine(conf.taller_latitud, conf.taller_longitud, t.latitud, t.longitud)
+                t.distancia_calculada = round(dist, 1)
+                if dist <= max_km:
+                    tiendas_filtradas.append(t)
+        tiendas = tiendas_filtradas
+    else:
+        for t in tiendas:
+            if t.latitud and t.longitud:
+                dist = haversine(conf.taller_latitud, conf.taller_longitud, t.latitud, t.longitud)
+                t.distancia_calculada = round(dist, 1)
+
     tiendas_geo = []
     for t in tiendas:
         if t.latitud and t.longitud:
             tiendas_geo.append({
-                'id': t.id, 'nombre': t.nombre,
-                'direccion': t.direccion, 'referencia': t.referencia or '',
-                'telefono': t.telefono or '', 'whatsapp': t.whatsapp or '',
-                'horario': t.horario or '',
-                'categorias': t.categorias_repuestos or '',
-                'notas': t.notas or '',
-                'lat': t.latitud, 'lng': t.longitud,
+                'id': t.id,
+                'nombre': t.nombre,
+                'lat': t.latitud,
+                'lng': t.longitud,
+                'direccion': t.direccion,
+                'referencia': t.referencia or '',
                 'favorita': t.es_favorita,
-                'maps_link': t.google_maps_link or '',
+                'whatsapp': t.whatsapp or '',
+                'telefono': t.telefono or '',
+                'horario': t.horario or '',
+                'notas': t.notas or '',
+                'categorias': t.categorias_repuestos or '',
+                'maps_link': t.google_maps_link or ''
             })
 
-    return render_template('directorio.html',
-        tiendas=tiendas, tiendas_geo=json.dumps(tiendas_geo),
+    return render_template('directorio.html', 
+        tiendas=tiendas, 
+        tiendas_geo=json.dumps(tiendas_geo),
         buscar=buscar, categ_f=categ_f, favoritas=favoritas,
+        distancia_max=distancia_max,
         categorias=CATEGORIAS_TIENDA,
+        conf=conf
     )
+
+@main.route('/configuracion', methods=['GET', 'POST'])
+@login_required
+def configuracion():
+    conf = Configuracion.query.first()
+    if not conf:
+        conf = Configuracion()
+        db.session.add(conf)
+        db.session.commit()
+        
+    if request.method == 'POST':
+        conf.taller_nombre = request.form.get('taller_nombre', 'Tecnicmaq ECK')
+        try:
+            conf.taller_latitud = float(request.form.get('taller_latitud', -12.006110))
+            conf.taller_longitud = float(request.form.get('taller_longitud', -75.243811))
+            conf.alerta_stock_minimo = int(request.form.get('alerta_stock_minimo', 5))
+        except ValueError:
+            pass
+        db.session.commit()
+        flash('Configuración actualizada exitosamente', 'success')
+        return redirect(url_for('main.configuracion'))
+        
+    return render_template('configuracion.html', config=conf)
 
 @main.route('/directorio/agregar', methods=['POST'])
 @login_required

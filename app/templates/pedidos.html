@@ -97,7 +97,7 @@
 
           <!-- Panel derecho: Cantidad + Acciones -->
           <div style="width:180px; border-left:1px solid var(--border);
-                      background:{{ '#FFF9F9' if p.estado != 'Comprado' else 'var(--bg-subtle)' }};
+                      background:{{ 'var(--red-light)' if p.estado != 'Comprado' else 'var(--bg-subtle)' }};
                       border-radius:0 var(--radius-lg) var(--radius-lg) 0;
                       display:flex; flex-direction:column; align-items:center;
                       justify-content:center; gap:8px; padding:14px; flex-shrink:0;">
@@ -119,7 +119,7 @@
                 <i class="bi bi-search" style="font-size:11px;"></i> Buscar precio
               </button>
               <ul class="dropdown-menu border-0 shadow-lg rounded-3 p-2"
-                  style="background:#fff; border:1px solid var(--border) !important; min-width:170px; font-size:13px;">
+                  style="background:var(--bg); border:1px solid var(--border) !important; min-width:170px; font-size:13px;">
                 <li><h6 style="font-size:10px; font-weight:700; color:var(--text-4); text-transform:uppercase; letter-spacing:1px; padding:6px 8px 4px;">Comparar en</h6></li>
                 <li>
                   <a class="dropdown-item rounded-2 py-2" target="_blank"

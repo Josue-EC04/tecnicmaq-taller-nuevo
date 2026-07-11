@@ -44,6 +44,31 @@
   --transition:   all .18s cubic-bezier(.4,0,.2,1);
 }
 
+/* ─── DARK THEME ─────────────────────────── */
+[data-theme="dark"] {
+  --bg:           #111827;
+  --bg-subtle:    #1F2937;
+  --bg-hover:     #374151;
+  --sidebar-bg:   #0F131D;
+
+  --border:       #374151;
+  
+  --text-1:       #F9FAFB;
+  --text-2:       #E5E7EB;
+  --text-3:       #9CA3AF;
+  --text-4:       #6B7280;
+
+  --red-light:    rgba(232,0,30,0.15);
+  --red-mid:      rgba(232,0,30,0.25);
+  
+  --green-bg:     rgba(5,150,105,0.15);
+  --amber-bg:     rgba(217,119,6,0.15);
+
+  --shadow-sm:    0 1px 3px rgba(0,0,0,.3);
+  --shadow:       0 4px 16px rgba(0,0,0,.4);
+  --shadow-lg:    0 12px 40px rgba(0,0,0,.5);
+}
+
 /* ─── RESET & BASE ───────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 14px; scroll-behavior: smooth; }

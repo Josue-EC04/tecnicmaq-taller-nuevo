@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Configuración – ECK Panel{% endblock %}
+{% block breadcrumb %}Configuración del Sistema{% endblock %}
+
+{% block content %}
+<div class="eck-page-header">
+  <div>
+    <h2 class="eck-heading">Configuración</h2>
+    <p class="eck-subheading">Ajustes generales del sistema y ubicación del taller</p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-8 mx-auto">
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px;">
+      
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} mb-4" style="border-radius:var(--radius); font-size:14px;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST">
+        <h4 style="font-size:16px; font-weight:700; color:var(--text-1); margin-bottom:16px;">
+          <i class="bi bi-geo-alt"></i> Ubicación del Taller (Mapa)
+        </h4>
+        <p style="font-size:13px; color:var(--text-4); margin-bottom:20px;">
+          Estas coordenadas se usarán como punto central en el Directorio de Tiendas y para calcular las distancias a los proveedores.
+        </p>
+
+        <div class="mb-3">
+          <label class="eck-label">Nombre del Taller</label>
+          <input type="text" name="taller_nombre" class="eck-input" value="{{ config.taller_nombre }}" required>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-6">
+            <label class="eck-label">Latitud</label>
+            <input type="number" step="any" name="taller_latitud" class="eck-input mono" value="{{ config.taller_latitud }}" required>
+          </div>
+          <div class="col-6">
+            <label class="eck-label">Longitud</label>
+            <input type="number" step="any" name="taller_longitud" class="eck-input mono" value="{{ config.taller_longitud }}" required>
+          </div>
+        </div>
+
+        <h4 style="font-size:16px; font-weight:700; color:var(--text-1); margin-top:28px; margin-bottom:16px;">
+          <i class="bi bi-box-seam"></i> Inventario y Alertas
+        </h4>
+        <p style="font-size:13px; color:var(--text-4); margin-bottom:20px;">
+          Ajusta cuándo quieres que el sistema te avise que un repuesto se está agotando (marcado en rojo).
+        </p>
+        <div class="mb-4">
+          <label class="eck-label">Umbral de Alerta de Stock Bajo (unidades)</label>
+          <input type="number" step="1" min="1" name="alerta_stock_minimo" class="eck-input mono" value="{{ config.alerta_stock_minimo }}" required style="max-width: 200px;">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; border-top:1px solid var(--border); padding-top:16px;">
+          <button type="submit" class="btn-eck btn-eck-primary">
+            <i class="bi bi-save"></i> Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
