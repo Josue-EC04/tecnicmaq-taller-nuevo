@@ -699,9 +699,10 @@ def subir_backup():
 # MÓDULO: GESTIÓN DE RESIDUOS
 # ═══════════════════════════════════════════════════════════════
 
-CATEGORIAS_RESIDUO = ['Eléctrico', 'Mecánico', 'Hidráulico', 'Otro']
-ESTADOS_RESIDUO    = ['Acumulado', 'En búsqueda', 'Derivado', 'Desechado']
+CATEGORIAS_RESIDUO = ['Eléctrico', 'Mecánico', 'Hidráulico', 'Químico', 'Otro']
+ESTADOS_RESIDUO    = ['Acumulado', 'En búsqueda', 'Derivado', 'Desechado', 'Entregado al Cliente']
 DESTINOS_RESIDUO   = ['Chatarrero', 'Reciclaje formal', 'Donación', 'Desecho convencional']
+ALERTA_PESO_KG     = 100  # Umbral en kg para disparar la alerta de espacio
 
 @main.route('/residuos')
 @login_required
@@ -713,17 +714,38 @@ def residuos():
     if categ_f:   query = query.filter_by(categoria=categ_f)
     items = query.order_by(Residuo.fecha_registro.desc()).all()
 
-    # KPIs
+    # KPIs básicos
     total_acumulado  = Residuo.query.filter_by(estado='Acumulado').count()
     total_buscando   = Residuo.query.filter_by(estado='En búsqueda').count()
     total_derivado   = Residuo.query.filter_by(estado='Derivado').count()
     ganancia_total   = db.session.query(func.sum(Residuo.ganancia_chatarra)).scalar() or 0
+
+    # KPI: Huella ecológica (kg desviados de vertederos vía reciclaje o donación)
+    kg_reciclados = db.session.query(
+        func.sum(Residuo.peso_kg)
+    ).filter(
+        Residuo.destino.in_(['Reciclaje formal', 'Donación']),
+        Residuo.peso_kg.isnot(None)
+    ).scalar() or 0
+
+    # Alerta de espacio: sumar kg en estado Acumulado
+    kg_acumulados = db.session.query(
+        func.sum(Residuo.peso_kg)
+    ).filter(
+        Residuo.estado == 'Acumulado',
+        Residuo.peso_kg.isnot(None)
+    ).scalar() or 0
+    alerta_espacio = kg_acumulados >= ALERTA_PESO_KG
 
     return render_template('residuos.html',
         items=items, estado_f=estado_f, categ_f=categ_f,
         categorias=CATEGORIAS_RESIDUO, estados=ESTADOS_RESIDUO, destinos=DESTINOS_RESIDUO,
         total_acumulado=total_acumulado, total_buscando=total_buscando,
         total_derivado=total_derivado, ganancia_total=ganancia_total,
+        kg_reciclados=round(float(kg_reciclados), 2),
+        kg_acumulados=round(float(kg_acumulados), 2),
+        alerta_espacio=alerta_espacio,
+        alerta_umbral=ALERTA_PESO_KG,
     )
 
 @main.route('/residuos/agregar', methods=['POST'])
@@ -736,6 +758,7 @@ def agregar_residuo():
             cantidad=int(request.form.get('cantidad') or 1),
             peso_kg=float(request.form.get('peso_kg') or 0) or None,
             origen=request.form.get('origen', '').strip() or None,
+            es_peligroso=request.form.get('es_peligroso') == 'on',
         )
         db.session.add(r)
         db.session.commit()
@@ -753,6 +776,7 @@ def derivar_residuo(id):
     r.destino           = request.form.get('destino', '')
     r.destino_detalle   = request.form.get('destino_detalle', '').strip() or None
     r.ganancia_chatarra = float(request.form.get('ganancia_chatarra') or 0)
+    r.manifiesto_codigo = request.form.get('manifiesto_codigo', '').strip() or None
     r.fecha_derivacion  = datetime.now()
     db.session.commit()
     flash(f'Residuo "{r.nombre}" actualizado como {r.estado}.', 'success')
