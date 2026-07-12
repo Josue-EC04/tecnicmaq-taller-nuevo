@@ -9,6 +9,7 @@ Ejecutar una sola vez:
 
 from app import create_app
 from app.models import db
+from sqlalchemy import text
 
 app = create_app()
 
@@ -24,17 +25,18 @@ with app.app_context():
     
     # --- Añadir 'es_peligroso' ---
     if not columna_existe(conn, 'residuo', 'es_peligroso'):
-        db.engine.execute("ALTER TABLE residuo ADD COLUMN es_peligroso BOOLEAN DEFAULT FALSE")
+        conn.execute(text("ALTER TABLE residuo ADD COLUMN es_peligroso BOOLEAN DEFAULT FALSE"))
         print("[OK] Columna 'es_peligroso' añadida.")
     else:
         print("[--] Columna 'es_peligroso' ya existe, omitida.")
 
     # --- Añadir 'manifiesto_codigo' ---
     if not columna_existe(conn, 'residuo', 'manifiesto_codigo'):
-        db.engine.execute("ALTER TABLE residuo ADD COLUMN manifiesto_codigo VARCHAR(100)")
+        conn.execute(text("ALTER TABLE residuo ADD COLUMN manifiesto_codigo VARCHAR(100)"))
         print("[OK] Columna 'manifiesto_codigo' añadida.")
     else:
         print("[--] Columna 'manifiesto_codigo' ya existe, omitida.")
 
+    conn.commit()
     conn.close()
     print("\nMigración completada. Tus datos existentes están intactos.")
