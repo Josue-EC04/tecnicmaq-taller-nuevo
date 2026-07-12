@@ -60,19 +60,22 @@ class PedidoCompra(db.Model):
 class Residuo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
-    categoria = db.Column(db.String(50), nullable=False)   # Eléctrico / Mecánico / Hidráulico / Otro
+    categoria = db.Column(db.String(50), nullable=False)   # Eléctrico / Mecánico / Hidráulico / Químico / Otro
     cantidad = db.Column(db.Integer, default=1)
     peso_kg = db.Column(db.Float, nullable=True)           # Peso estimado (para chatarra)
-    origen = db.Column(db.String(200), nullable=True)      # De qué trabajo salió
+    origen = db.Column(db.String(200), nullable=True)      # De qué trabajo salió (texto libre)
     # Ciclo de vida
     estado = db.Column(db.String(30), default='Acumulado')
-    # Acumulado / En búsqueda / Derivado / Desechado
+    # Acumulado / En búsqueda / Derivado / Desechado / Entregado al Cliente
     destino = db.Column(db.String(50), nullable=True)
     # Chatarrero / Reciclaje formal / Donación / Desecho convencional
     destino_detalle = db.Column(db.String(200), nullable=True)  # Nombre de chatarrero, persona, etc.
     ganancia_chatarra = db.Column(db.Float, default=0.0)        # S/ obtenidos si se vendió
     fecha_registro = db.Column(db.DateTime, default=datetime.now)
     fecha_derivacion = db.Column(db.DateTime, nullable=True)    # Cuándo se entregó/desechó
+    # ── CAMPOS DE CUMPLIMIENTO AMBIENTAL ─────────────────────────────────────
+    es_peligroso = db.Column(db.Boolean, default=False)         # Aceites, baterías, químicos, etc.
+    manifiesto_codigo = db.Column(db.String(100), nullable=True) # Código del certificado/manifiesto de disposición final
 
 # ── MÓDULO DIRECTORIO DE TIENDAS ─────────────────────────────────────────────
 class TiendaProveedor(db.Model):

@@ -14,6 +14,21 @@
   </button>
 </div>
 
+<!-- Alerta de espacio máximo -->
+{% if alerta_espacio %}
+<div style="display:flex; align-items:center; gap:12px; padding:14px 18px; margin-bottom:16px;
+            background:#FFFBEB; border:1px solid #F59E0B; border-radius:var(--radius); border-left:4px solid #F59E0B;">
+  <i class="bi bi-exclamation-triangle-fill" style="color:#D97706; font-size:20px; flex-shrink:0;"></i>
+  <div>
+    <div style="font-weight:700; font-size:13px; color:#92400E;">Espacio de almacenamiento al límite</div>
+    <div style="font-size:12px; color:#78350F;">
+      Tienes <strong>{{ kg_acumulados }} kg</strong> de residuos acumulados en el taller (límite: {{ alerta_umbral }} kg).
+      Considera llamar al chatarrero o derivar a un punto de reciclaje.
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- KPIs -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
@@ -50,6 +65,20 @@
   </div>
 </div>
 
+<!-- KPI adicional: Huella Ecológica -->
+<div style="display:flex; align-items:center; gap:14px; padding:14px 18px; margin-bottom:16px;
+            background:#ECFDF5; border:1px solid #A7F3D0; border-radius:var(--radius);">
+  <i class="bi bi-tree-fill" style="color:#059669; font-size:24px; flex-shrink:0;"></i>
+  <div style="flex:1;">
+    <div style="font-size:12px; font-weight:700; color:#065F46; text-transform:uppercase; letter-spacing:.5px;">♻️ Huella Ecológica Positiva</div>
+    <div style="font-size:11px; color:#047857; margin-top:2px;">Kilogramos de residuos desviados de vertederos (reciclaje formal + donaciones)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:800; color:#059669;">
+    {{ kg_reciclados }} <span style="font-size:13px; font-weight:600;">kg</span>
+  </div>
+</div>
+
+
 <!-- Filtros -->
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
   <a href="{{ url_for('main.residuos') }}"
@@ -57,10 +86,10 @@
     Todos
   </a>
   {% for est in estados %}
-  {% set colores = {'Acumulado':'#D97706','En búsqueda':'#1D4ED8','Derivado':'#059669','Desechado':'#6B7280'} %}
+  {% set colores = {'Acumulado':'#D97706','En búsqueda':'#1D4ED8','Derivado':'#059669','Desechado':'#6B7280','Entregado al Cliente':'#7C3AED'} %}
   <a href="{{ url_for('main.residuos', estado=est) }}"
      class="btn-eck btn-eck-sm btn-eck-ghost {{ 'active' if estado_f == est }}"
-     style="{{ 'background:' + colores[est] + '15; border-color:' + colores[est] + '; color:' + colores[est] + ';' if estado_f == est }}">
+     style="{{ 'background:' + colores.get(est,'#6B7280') + '15; border-color:' + colores.get(est,'#6B7280') + '; color:' + colores.get(est,'#6B7280') + ';' if estado_f == est }}">
     {{ est }}
   </a>
   {% endfor %}
@@ -93,15 +122,26 @@
     <tbody>
       {% for r in items %}
       {% set estado_cfg = {
-        'Acumulado':   ('D97706','FFFBEB','FDE68A','clock'),
-        'En búsqueda': ('1D4ED8','EFF6FF','BFDBFE','search'),
-        'Derivado':    ('059669','ECFDF5','A7F3D0','check-circle'),
-        'Desechado':   ('6B7280','F9FAFB','E5E7EB','trash'),
+        'Acumulado':           ('D97706','FFFBEB','FDE68A','clock'),
+        'En búsqueda':         ('1D4ED8','EFF6FF','BFDBFE','search'),
+        'Derivado':            ('059669','ECFDF5','A7F3D0','check-circle'),
+        'Desechado':           ('6B7280','F9FAFB','E5E7EB','trash'),
+        'Entregado al Cliente':('7C3AED','F5F3FF','DDD6FE','person-check'),
       } %}
       {% set cfg = estado_cfg.get(r.estado, ('6B7280','F9FAFB','E5E7EB','dash')) %}
       <tr>
         <td style="padding-left:20px;">
-          <div style="font-size:13.5px; font-weight:600; color:var(--text-1);">{{ r.nombre }}</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:13.5px; font-weight:600; color:var(--text-1);">{{ r.nombre }}</span>
+            {% if r.es_peligroso %}
+            <span title="Residuo peligroso" style="display:inline-flex; align-items:center; gap:3px;
+                         font-size:10px; font-weight:700; color:#DC2626;
+                         background:#FEF2F2; border:1px solid #FECACA;
+                         border-radius:50px; padding:1px 7px;">
+              <i class="bi bi-exclamation-triangle-fill" style="font-size:9px;"></i> PELIGROSO
+            </span>
+            {% endif %}
+          </div>
           {% if r.origen %}
           <div style="font-size:11.5px; color:var(--text-4);">
             <i class="bi bi-wrench" style="font-size:10px;"></i> {{ r.origen }}
@@ -117,7 +157,7 @@
           </span>
         </td>
         <td>
-          {% set cat_color = {'Eléctrico':'#F59E0B','Mecánico':'#3B82F6','Hidráulico':'#8B5CF6','Otro':'#6B7280'} %}
+          {% set cat_color = {'Eléctrico':'#F59E0B','Mecánico':'#3B82F6','Hidráulico':'#8B5CF6','Químico':'#EF4444','Otro':'#6B7280'} %}
           <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700;
                        color:{{ cat_color.get(r.categoria,'#6B7280') }};
                        background:{{ cat_color.get(r.categoria,'#6B7280') }}15;
@@ -140,6 +180,12 @@
           {% if r.destino_detalle %}
           <div style="font-size:11.5px; color:var(--text-4);">{{ r.destino_detalle }}</div>
           {% endif %}
+          {% if r.manifiesto_codigo %}
+          <div style="font-size:10.5px; color:#4F46E5; font-weight:600; margin-top:2px;"
+               title="Código de manifiesto de disposición final">
+            <i class="bi bi-file-earmark-check" style="font-size:10px;"></i> {{ r.manifiesto_codigo }}
+          </div>
+          {% endif %}
           {% if r.ganancia_chatarra %}
           <div style="font-size:11px; color:#059669; font-weight:700; font-family:'JetBrains Mono',monospace;">
             +S/{{ "%.2f"|format(r.ganancia_chatarra) }}
@@ -161,7 +207,7 @@
         </td>
         <td class="text-end" style="padding-right:20px;">
           <div style="display:flex; gap:4px; justify-content:flex-end;">
-            {% if r.estado not in ('Derivado','Desechado') %}
+            {% if r.estado not in ('Derivado','Desechado','Entregado al Cliente') %}
             <button class="btn-eck btn-eck-ghost btn-eck-sm"
                     onclick="abrirDerivar({{ r.id }}, '{{ r.nombre|replace("'","\\'")|e }}')"
                     style="font-size:12px;" title="Gestionar destino">
@@ -245,6 +291,20 @@
             <input type="text" name="origen" class="eck-input" placeholder="Ej: Reparación Toyota Hilux - Cliente García">
           </div>
 
+          <!-- Checkbox residuo peligroso -->
+          <div style="display:flex; align-items:center; gap:10px; padding:12px 14px;
+                      background:#FEF2F2; border:1px solid #FECACA; border-radius:var(--radius);">
+            <div class="form-check form-switch mb-0" style="padding-left:2.5em;">
+              <input class="form-check-input" type="checkbox" name="es_peligroso" id="checkPeligroso"
+                     style="width:2.2em; height:1.2em; cursor:pointer;">
+              <label class="form-check-label" for="checkPeligroso"
+                     style="font-size:13px; font-weight:600; color:#DC2626; cursor:pointer; padding-left:6px;">
+                <i class="bi bi-exclamation-triangle-fill"></i> ¿Es residuo peligroso?
+              </label>
+            </div>
+            <span style="font-size:11px; color:#991B1B;">(Aceites, baterías, refrigerantes, solventes)</span>
+          </div>
+
           <div style="padding:12px 14px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:var(--radius); display:flex; gap:10px;">
             <i class="bi bi-leaf-fill" style="color:#059669; font-size:14px; flex-shrink:0; margin-top:1px;"></i>
             <p style="font-size:12px; color:#065F46; margin:0; line-height:1.5;">
@@ -311,6 +371,18 @@
                    placeholder="0.00" value="0">
           </div>
 
+          <!-- Campo: Código de Manifiesto -->
+          <div id="sectionManifiesto">
+            <label class="eck-label" style="color:#4F46E5;">
+              <i class="bi bi-file-earmark-check"></i> Código de Manifiesto / Constancia (Opcional)
+            </label>
+            <input type="text" name="manifiesto_codigo" class="eck-input"
+                   placeholder="Ej: MAN-2026-001, Cert. EO-RS, etc.">
+            <div style="font-size:11px; color:var(--text-4); margin-top:4px;">
+              Para residuos derivados a empresas de reciclaje especializadas (EO-RS/EPS-RS).
+            </div>
+          </div>
+
           <!-- Tip precios chatarra Huancayo -->
           <div style="padding:12px 14px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:var(--radius);">
             <div style="font-size:11px; font-weight:700; color:#92400E; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px;">
@@ -346,8 +418,17 @@ function abrirDerivar(id, nombre) {
   new bootstrap.Modal(document.getElementById('modalDerivar')).show();
 }
 function mostrarDestino(val) {
-  const show = (val === 'Derivado' || val === 'Desechado');
+  const show = (val === 'Derivado' || val === 'Desechado' || val === 'Entregado al Cliente');
   document.getElementById('sectionDestino').style.display = show ? '' : 'none';
+  // Mostrar campo manifiesto solo si se va a derivar formalmente
+  const showMan = (val === 'Derivado');
+  const secMan = document.getElementById('sectionManifiesto');
+  if (secMan) secMan.style.display = showMan ? '' : 'none';
 }
+// Estado inicial del modal de derivar
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.querySelector('#formDerivar select[name="estado"]');
+  if (sel) mostrarDestino(sel.value);
+});
 </script>
 {% endblock %}
