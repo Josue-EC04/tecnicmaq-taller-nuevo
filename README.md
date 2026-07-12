@@ -44,6 +44,22 @@ Un enfoque moderno para transformar la "basura" del taller en valor rastreable:
 
 ---
 
+### 🛠️ Implementación de la Gestión de Residuos
+
+Se añadió el script **actualizar_residuos.py** que migra la tabla **residuo** añadiendo dos nuevas columnas:
+
+- `es_peligroso` (BOOLEAN, default `FALSE`): indica si el residuo es peligroso.
+- `manifiesto_codigo` (VARCHAR(100)): código del manifiesto asociado.
+
+Ejecutar una única vez:
+
+```bash
+python actualizar_residuos.py
+```
+
+El script verifica la existencia de las columnas antes de crearlas, garantizando que los datos existentes no se pierdan.
+
+
 ## 🛠️ Tecnologías y Herramientas
 
 | Componente | Tecnología |
