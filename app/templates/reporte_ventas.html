@@ -4,6 +4,18 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  /* Transición suave para los paneles del historial */
+  #accordionVentas .collapse { transition: height 0.3s ease; }
+  /* Rotación del chevron al expandir */
+  #accordionVentas button[aria-expanded="true"] .bi-chevron-down,
+  #accordionVentas button:not(.collapsed) .bi-chevron-down {
+    transform: rotate(180deg);
+  }
+  #accordionVentas .bi-chevron-down { transition: transform 0.25s ease; }
+  /* Resaltar fila al pasar mouse */
+  .eck-table tbody tr:hover { background: var(--bg-subtle); }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -13,6 +25,9 @@
     <h2 class="eck-heading">Reportes de Ventas</h2>
     <p class="eck-subheading">Análisis financiero y rendimiento del taller</p>
   </div>
+  <a href="{{ url_for('main.exportar_excel') }}" class="btn btn-sm" style="background:var(--bg-subtle); border:1px solid var(--border); color:var(--text-2); font-size:12.5px; font-weight:600; padding:7px 16px; border-radius:8px; display:inline-flex; align-items:center; gap:6px; text-decoration:none; transition:all .15s;" onmouseover="this.style.borderColor='var(--red)'; this.style.color='var(--red)';" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">
+    <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+  </a>
 </div>
 
 <!-- ── KPIs superiores ── -->
@@ -56,6 +71,35 @@
       <div class="eck-kpi-value mono" style="font-size:20px; color:#059669;">S/{{ "%.2f"|format(gan_hoy) }}</div>
       <div class="eck-kpi-sub">neta del día</div>
       <i class="bi bi-cash eck-kpi-icon"></i>
+    </div>
+  </div>
+</div>
+
+<!-- ── KPIs secundarios ── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="eck-kpi">
+      <div class="eck-kpi-label">Ticket Promedio</div>
+      <div class="eck-kpi-value mono" style="font-size:20px; color:#7C3AED;">S/{{ "%.2f"|format(ticket_promedio) }}</div>
+      <div class="eck-kpi-sub">valor promedio por venta</div>
+      <i class="bi bi-tag eck-kpi-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="eck-kpi">
+      <div class="eck-kpi-label">Ingresos Semana</div>
+      <div class="eck-kpi-value mono" style="font-size:20px; color:#1D4ED8;">S/{{ "%.2f"|format(ing_semana) }}</div>
+      <div class="eck-kpi-sub">
+        {% if ing_sem_pasada > 0 %}
+          {% set diff_sem = ((ing_semana - ing_sem_pasada) / ing_sem_pasada * 100)|round(1) %}
+          <span style="color:{{ '#059669' if diff_sem >= 0 else 'var(--red)' }}">
+            {{ '+' if diff_sem >= 0 }}{{ diff_sem }}% vs sem. anterior
+          </span>
+        {% else %}
+          vs sem. anterior: S/{{ "%.2f"|format(ing_sem_pasada) }}
+        {% endif %}
+      </div>
+      <i class="bi bi-calendar-week eck-kpi-icon"></i>
     </div>
   </div>
 </div>
@@ -148,7 +192,7 @@
             <tr>
               <td style="padding-left:20px;">
                 <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3);">
-                  {{ venta.fecha.strftime('%d/%m %H:%M') }}
+                  {{ venta.fecha.strftime('%d/%m/%Y %H:%M') }}
                 </span>
               </td>
               <td>
@@ -188,7 +232,10 @@
       <i class="bi bi-graph-up"></i>
     </div>
     <h3 style="font-size:17px; font-weight:700; color:var(--text-1); margin-bottom:8px;">Sin ventas registradas</h3>
-    <p style="font-size:13.5px; color:var(--text-3);">Las ventas aparecerán aquí una vez registradas desde el inventario.</p>
+    <p style="font-size:13.5px; color:var(--text-3); margin-bottom:16px;">Las ventas aparecerán aquí una vez registradas desde el inventario.</p>
+    <a href="{{ url_for('main.inventario') }}" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--red); text-decoration:none; padding:8px 18px; border:1px solid var(--red); border-radius:8px; transition:all .15s;" onmouseover="this.style.background='var(--red)'; this.style.color='#fff';" onmouseout="this.style.background='transparent'; this.style.color='var(--red)';">
+      <i class="bi bi-boxes"></i> Ir al Inventario
+    </a>
   </div>
   {% endfor %}
 </div>

@@ -1,0 +1,162 @@
+================================================================================
+  CAMBIOS REALIZADOS EN EL MÓDULO "REPORTE DE VENTAS"
+  Proyecto: Tecnicmaq ECK Panel
+  Fecha: 13 de julio de 2026
+================================================================================
+
+Se realizaron MEJORAS PEQUEÑAS (sin cambiar la estructura general) para que
+el reporte de ventas sea más útil, más informativo y más cómodo de usar.
+
+────────────────────────────────────────────────────────────────────────────────
+ARCHIVOS MODIFICADOS:
+  1. app/routes.py          → Lógica backend (función historial_ventas)
+  2. app/templates/reporte_ventas.html → Plantilla frontend
+────────────────────────────────────────────────────────────────────────────────
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ CAMBIO 1: Nuevo KPI "Ticket Promedio"
+═══════════════════════════════════════════════════════════════════════════════
+
+  Archivo: routes.py + reporte_ventas.html
+
+  ¿Qué se hizo?
+    Se agregó una nueva tarjeta KPI que muestra el valor promedio de cada
+    venta (ingresos totales ÷ número de ventas).
+
+  ¿Para qué sirve?
+    Permite saber cuánto gasta en promedio cada cliente por transacción.
+    Esto ayuda a:
+    - Detectar si las ventas son de productos caros o baratos.
+    - Evaluar si conviene empujar productos de mayor margen.
+    - Comparar períodos: si el ticket sube, se venden cosas más caras.
+
+  Color elegido: Morado (#7C3AED) para diferenciarlo visualmente de los
+  KPIs existentes (verde, azul, rojo).
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ CAMBIO 2: Nuevo KPI "Ingresos Semana" con comparación semanal
+═══════════════════════════════════════════════════════════════════════════════
+
+  Archivo: routes.py + reporte_ventas.html
+
+  ¿Qué se hizo?
+    Se agregó una tarjeta KPI que muestra los ingresos acumulados de la
+    semana actual (lunes a hoy) y los compara con la semana anterior,
+    mostrando el porcentaje de cambio (+X% o -X%).
+
+  ¿Para qué sirve?
+    El KPI de "Ingresos Hoy" solo muestra un día, lo cual puede ser
+    engañoso (un día bueno no significa una buena semana). Con la vista
+    semanal se tiene una perspectiva más realista del rendimiento reciente.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ CAMBIO 3: Gráfico de barras con orden cronológico y etiquetas en español
+═══════════════════════════════════════════════════════════════════════════════
+
+  Archivo: routes.py
+
+  ¿Qué se hizo?
+    ANTES:  Las etiquetas del gráfico mensual se mostraban como "7-2026"
+            y sin un orden cronológico garantizado (dependía del orden en
+            que Python iteraba el diccionario).
+    AHORA:  Las etiquetas se muestran como "Jul/26" y están ordenadas
+            cronológicamente de izquierda (más antiguo) a derecha (más
+            reciente).
+
+  ¿Para qué sirve?
+    - Se lee mucho más fácil ("Ene/26" vs "1-2026").
+    - El orden cronológico permite ver la tendencia real de ganancias:
+      si van subiendo, bajando, o se mantienen.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ CAMBIO 4: Fecha completa con año en el historial detallado
+═══════════════════════════════════════════════════════════════════════════════
+
+  Archivo: reporte_ventas.html
+
+  ¿Qué se hizo?
+    ANTES:  La columna "Fecha" mostraba "13/07 11:30" (sin año).
+    AHORA:  Muestra "13/07/2026 11:30" (con año).
+
+  ¿Para qué sirve?
+    Cuando el historial crece y tiene ventas de varios años, sin el año
+    no se puede distinguir si una venta fue de julio 2025 o julio 2026.
+    Es un detalle pequeño pero evita confusiones.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ CAMBIO 5: Botón "Exportar Excel" en el encabezado del reporte
+═══════════════════════════════════════════════════════════════════════════════
+
+  Archivo: reporte_ventas.html
+
+  ¿Qué se hizo?
+    Se agregó un botón en la esquina superior derecha del encabezado de la
+    página que enlaza directamente a la ruta /exportar_excel existente.
+
+  ¿Para qué sirve?
+    Antes, para exportar el Excel había que ir a otra sección. Ahora el
+    usuario puede hacerlo directamente desde el reporte donde está viendo
+    los datos, sin tener que navegar a otro lugar.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ CAMBIO 6: Animaciones suaves en el historial (accordion)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Archivo: reporte_ventas.html (CSS inline en extra_head)
+
+  ¿Qué se hizo?
+    - Se añadió una transición CSS suave al expandir/contraer los
+      periodos del historial (transition: height 0.3s ease).
+    - El icono chevron (▼) ahora rota 180° al expandir el panel,
+      dando retroalimentación visual clara.
+    - Las filas de la tabla se resaltan sutilmente al pasar el mouse
+      (hover con background var(--bg-subtle)).
+
+  ¿Para qué sirve?
+    Son micro-interacciones que hacen que la interfaz se sienta más
+    fluida y profesional. El usuario sabe visualmente si un panel
+    está abierto o cerrado gracias a la rotación del chevron.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ CAMBIO 7: Estado vacío mejorado con botón de acción
+═══════════════════════════════════════════════════════════════════════════════
+
+  Archivo: reporte_ventas.html
+
+  ¿Qué se hizo?
+    ANTES:  Cuando no había ventas, solo se mostraba el texto
+            "Sin ventas registradas" sin ninguna acción posible.
+    AHORA:  Se agregó un botón "Ir al Inventario" debajo del mensaje,
+            que lleva directamente a la página de inventario donde se
+            pueden registrar ventas.
+
+  ¿Para qué sirve?
+    Guía al usuario nuevo o al que acaba de instalar el sistema.
+    En vez de dejarlo "perdido" en una página vacía, le indica
+    exactamente qué hacer a continuación.
+
+
+════════════════════════════════════════════════════════════════════════════════
+ RESUMEN DE CAMBIOS
+════════════════════════════════════════════════════════════════════════════════
+
+  Cambio                             | Tipo        | Impacto
+  -----------------------------------|-------------|---------------------------
+  KPI Ticket Promedio                | Nuevo       | Análisis de negocio
+  KPI Ingresos Semana                | Nuevo       | Comparación semanal
+  Gráfico cronológico + español      | Mejora      | Legibilidad de datos
+  Fecha con año en historial         | Mejora      | Claridad en registros
+  Botón Exportar Excel               | Mejora UX   | Acceso directo
+  Animaciones accordion              | Mejora UX   | Fluidez visual
+  Estado vacío con botón             | Mejora UX   | Guía al usuario
+
+  NOTA: Ningún cambio altera la estructura general del reporte, la base
+  de datos, ni las rutas existentes. Son mejoras incrementales 100%
+  compatibles con el código anterior.
