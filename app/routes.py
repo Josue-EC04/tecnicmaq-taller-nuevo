@@ -390,12 +390,29 @@ def gestion_pedido(id, accion):
 @main.route('/historial-ventas')
 @login_required
 def historial_ventas():
-    ventas = Venta.query.order_by(Venta.fecha.desc()).all()
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    q = request.args.get('q', '').strip()
+
+    query = Venta.query
+
+    if start_date:
+        query = query.filter(func.date(Venta.fecha) >= start_date)
+    if end_date:
+        query = query.filter(func.date(Venta.fecha) <= end_date)
+    if q:
+        query = query.filter(or_(Venta.repuesto_nombre.ilike(f'%{q}%'), Venta.repuesto_codigo.ilike(f'%{q}%')))
+
+    ventas = query.order_by(Venta.fecha.desc()).all()
 
     # Ganancias por mes (grafico de barras)
     ganancias = defaultdict(float)
+    # Ventas por dia (grafico de lineas)
+    ventas_diarias = defaultdict(float)
+    
     for v in ventas:
         ganancias[f"{v.fecha.month}-{v.fecha.year}"] += v.ganancia_total
+        ventas_diarias[v.fecha.strftime('%d-%m-%Y')] += v.ganancia_total
 
     # Historial agrupado por periodo
     historial = defaultdict(lambda: {'ventas': [], 'suma_ganancia': 0})
@@ -405,15 +422,24 @@ def historial_ventas():
         historial[k]['suma_ganancia'] += v.ganancia_total
 
     # Top 8 productos mas vendidos por cantidad → grafico donut
-    top_prod_raw = db.session.query(
+    # We must apply the same filters to the aggregation query
+    top_query = db.session.query(
         Venta.repuesto_nombre,
         func.sum(Venta.cantidad).label('qty'),
-        func.sum(Venta.ganancia_total).label('gan'),
-    ).group_by(Venta.repuesto_nombre).order_by(desc('qty')).limit(8).all()
+        func.sum(Venta.ganancia_total).label('gan')
+    )
+    if start_date: top_query = top_query.filter(func.date(Venta.fecha) >= start_date)
+    if end_date: top_query = top_query.filter(func.date(Venta.fecha) <= end_date)
+    if q: top_query = top_query.filter(or_(Venta.repuesto_nombre.ilike(f'%{q}%'), Venta.repuesto_codigo.ilike(f'%{q}%')))
+    
+    top_prod_raw = top_query.group_by(Venta.repuesto_nombre).order_by(desc('qty')).limit(8).all()
 
     top_prod_labels = json.dumps([r.repuesto_nombre[:25] for r in top_prod_raw])
-    top_prod_qty    = json.dumps([int(r.qty)                for r in top_prod_raw])
-    top_prod_gan    = json.dumps([round(float(r.gan), 2)   for r in top_prod_raw])
+    top_prod_qty    = json.dumps([int(r.qty) for r in top_prod_raw])
+    top_prod_gan    = json.dumps([round(float(r.gan), 2) for r in top_prod_raw])
+
+    # Producto Estrella
+    producto_estrella = top_prod_raw[0] if top_prod_raw else None
 
     # Ventas de hoy vs ayer
     from datetime import timedelta
@@ -424,20 +450,75 @@ def historial_ventas():
     gan_hoy  = db.session.query(func.sum(Venta.ganancia_total)).filter(func.date(Venta.fecha) == hoy).scalar()  or 0
 
     total_ganancia_global = sum(v.ganancia_total for v in ventas)
+    total_costo = sum(v.costo_unitario * v.cantidad for v in ventas)
+    
+    # Calcular crecimiento % (ing_hoy vs ing_ayer)
+    crecimiento_hoy = 0
+    if ing_ayer > 0:
+        crecimiento_hoy = round(((ing_hoy - ing_ayer) / ing_ayer) * 100, 1)
 
     return render_template('reporte_ventas.html',
         historial_agrupado=historial,
         total_ganancia_global=total_ganancia_global,
+        total_costo=total_costo,
         total_ventas_count=len(ventas),
         chart_labels=json.dumps(list(ganancias.keys())),
         chart_data=json.dumps(list(ganancias.values())),
+        line_labels=json.dumps(list(ventas_diarias.keys())),
+        line_data=json.dumps(list(ventas_diarias.values())),
         top_prod_labels=top_prod_labels,
         top_prod_qty=top_prod_qty,
         top_prod_gan=top_prod_gan,
+        producto_estrella=producto_estrella,
         ing_hoy=round(float(ing_hoy), 2),
         ing_ayer=round(float(ing_ayer), 2),
         gan_hoy=round(float(gan_hoy), 2),
+        crecimiento_hoy=crecimiento_hoy,
+        start_date=start_date,
+        end_date=end_date,
+        q=q
     )
+
+@main.route('/exportar_ventas_excel')
+@login_required
+def exportar_ventas_excel():
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    q = request.args.get('q', '').strip()
+
+    query = Venta.query
+
+    if start_date:
+        query = query.filter(func.date(Venta.fecha) >= start_date)
+    if end_date:
+        query = query.filter(func.date(Venta.fecha) <= end_date)
+    if q:
+        query = query.filter(or_(Venta.repuesto_nombre.ilike(f'%{q}%'), Venta.repuesto_codigo.ilike(f'%{q}%')))
+
+    ventas = query.order_by(Venta.fecha.desc()).all()
+
+    output = io.BytesIO()
+    data = [
+        {
+            'Fecha': v.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+            'Codigo': v.repuesto_codigo,
+            'Producto': v.repuesto_nombre,
+            'Cantidad': v.cantidad,
+            'Costo Unit.': v.costo_unitario,
+            'Precio Unit.': v.precio_unitario,
+            'Ingreso Total': v.precio_unitario * v.cantidad,
+            'Costo Total': v.costo_unitario * v.cantidad,
+            'Ganancia Neta': v.ganancia_total
+        }
+        for v in ventas
+    ]
+    import pandas as pd
+    df = pd.DataFrame(data)
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Ventas')
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='Historial_Ventas_Tecnicmaq.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @main.route('/eliminar_venta/<int:id>', methods=['POST'])
 @login_required

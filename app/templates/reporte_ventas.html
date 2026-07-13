@@ -4,200 +4,307 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  @media print {
+    body * { visibility: hidden; }
+    #printable-area, #printable-area * { visibility: visible; }
+    #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+    .no-print { display: none !important; }
+    .eck-card { box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-
-<div class="eck-page-header">
+<div class="eck-page-header no-print">
   <div>
     <h2 class="eck-heading">Reportes de Ventas</h2>
     <p class="eck-subheading">Análisis financiero y rendimiento del taller</p>
   </div>
-</div>
-
-<!-- ── KPIs superiores ── -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3">
-    <div class="eck-kpi">
-      <div class="eck-kpi-label">Ganancia Total</div>
-      <div class="eck-kpi-value mono" style="color:#059669; font-size:20px;">S/{{ "%.2f"|format(total_ganancia_global) }}</div>
-      <div class="eck-kpi-sub">Acumulado histórico</div>
-      <i class="bi bi-graph-up-arrow eck-kpi-icon"></i>
-    </div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="eck-kpi">
-      <div class="eck-kpi-label">Ventas Realizadas</div>
-      <div class="eck-kpi-value">{{ total_ventas_count }}</div>
-      <div class="eck-kpi-sub">Total de transacciones</div>
-      <i class="bi bi-receipt eck-kpi-icon"></i>
-    </div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="eck-kpi">
-      <div class="eck-kpi-label">Ingresos Hoy</div>
-      <div class="eck-kpi-value mono" style="font-size:20px; color:#1D4ED8;">S/{{ "%.2f"|format(ing_hoy) }}</div>
-      <div class="eck-kpi-sub">
-        {% if ing_ayer > 0 %}
-          {% set diff = ((ing_hoy - ing_ayer) / ing_ayer * 100)|round(1) %}
-          <span style="color:{{ '#059669' if diff >= 0 else 'var(--red)' }}">
-            {{ '+' if diff >= 0 }}{{ diff }}% vs ayer
-          </span>
-        {% else %}
-          vs ayer: S/{{ "%.2f"|format(ing_ayer) }}
-        {% endif %}
-      </div>
-      <i class="bi bi-calendar-day eck-kpi-icon"></i>
-    </div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="eck-kpi">
-      <div class="eck-kpi-label">Ganancia Hoy</div>
-      <div class="eck-kpi-value mono" style="font-size:20px; color:#059669;">S/{{ "%.2f"|format(gan_hoy) }}</div>
-      <div class="eck-kpi-sub">neta del día</div>
-      <i class="bi bi-cash eck-kpi-icon"></i>
-    </div>
-  </div>
-</div>
-
-<!-- ── Gráficos: barras mensuales + donut top productos ── -->
-<div class="row g-3 mb-4">
-
-  <!-- Ganancias mensuales -->
-  <div class="col-lg-7">
-    <div class="eck-card">
-      <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border);">
-        <div style="font-size:13px; font-weight:700; color:var(--text-1);">Ganancias Mensuales</div>
-        <div style="font-size:11.5px; color:var(--text-4);">Evolución histórica de ganancia neta</div>
-      </div>
-      <div style="padding:18px 20px; height:260px;">
-        <canvas id="ventasChart" style="height:100% !important;"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- Donut top productos -->
-  <div class="col-lg-5">
-    <div class="eck-card">
-      <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border);">
-        <div style="font-size:13px; font-weight:700; color:var(--text-1);">Top Productos</div>
-        <div style="font-size:11.5px; color:var(--text-4);">Por unidades vendidas</div>
-      </div>
-      <div style="padding:16px 20px; height:260px; display:flex; align-items:center; justify-content:center;">
-        <canvas id="topDonutChart" style="height:100% !important;"></canvas>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<!-- ── Ranking de productos (barra horizontal) ── -->
-<div class="eck-card mb-4">
-  <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
-    <div>
-      <div style="font-size:13px; font-weight:700; color:var(--text-1);">Ranking de Ganancias por Producto</div>
-      <div style="font-size:11.5px; color:var(--text-4);">Top 8 productos por ganancia neta generada</div>
-    </div>
-  </div>
-  <div style="padding:18px 20px; height:280px;">
-    <canvas id="rankingChart" style="height:100% !important;"></canvas>
-  </div>
-</div>
-
-<!-- ── Historial detallado ── -->
-<div style="font-size:12px; font-weight:700; color:var(--text-4); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">
-  Historial Detallado
-</div>
-
-<div id="accordionVentas" style="display:flex; flex-direction:column; gap:8px;">
-  {% for periodo, datos in historial_agrupado.items() %}
-  <div class="eck-card" style="overflow:hidden;">
-    <button class="d-flex align-items-center justify-content-between w-100"
-            type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}"
-            style="background:none; border:none; padding:14px 20px; cursor:pointer; text-align:left; width:100%;">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <i class="bi bi-calendar-month" style="color:var(--red); font-size:14px;"></i>
-        <span style="font-size:14px; font-weight:700; color:var(--text-1);">{{ periodo }}</span>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:12px; font-weight:600; color:var(--text-3); background:var(--bg-subtle); border:1px solid var(--border); border-radius:50px; padding:3px 11px;">
-          {{ datos['ventas']|length }} venta{{ 's' if datos['ventas']|length != 1 }}
-        </span>
-        <span style="font-size:12px; font-weight:700; color:#059669; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:50px; padding:3px 11px; font-family:'JetBrains Mono',monospace;">
-          +S/{{ "%.2f"|format(datos['suma_ganancia']) }}
-        </span>
-        <i class="bi bi-chevron-down" style="font-size:11px; color:var(--text-4);"></i>
-      </div>
+  <div class="d-flex gap-2 align-items-center">
+    <a href="{{ url_for('main.exportar_ventas_excel', start_date=start_date, end_date=end_date, q=q) }}" class="btn" style="background:#059669; color:#fff; font-size:13px; border-radius:6px; font-weight:600;">
+      <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+    </a>
+    <button onclick="window.print()" class="btn" style="background:var(--bg-subtle); color:var(--text-1); border:1px solid var(--border); font-size:13px; border-radius:6px; font-weight:600;">
+      <i class="bi bi-printer"></i> Imprimir
     </button>
+  </div>
+</div>
 
-    <div id="collapse{{ loop.index }}" class="accordion-collapse collapse">
-      <div class="eck-table-wrap" style="border-top:1px solid var(--border); border-radius:0;">
-        <table class="eck-table">
-          <thead>
-            <tr>
-              <th style="padding-left:20px;">Fecha</th>
-              <th>Producto</th>
-              <th class="text-center">Cant.</th>
-              <th>Venta</th>
-              <th>Ganancia</th>
-              <th class="text-end" style="padding-right:20px;"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for venta in datos['ventas'] %}
-            <tr>
-              <td style="padding-left:20px;">
-                <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3);">
-                  {{ venta.fecha.strftime('%d/%m %H:%M') }}
-                </span>
-              </td>
-              <td>
-                <div style="font-size:13.5px; font-weight:600; color:var(--text-1); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ venta.repuesto_nombre }}">
-                  {{ venta.repuesto_nombre }}
-                </div>
-                <span class="eck-code" style="font-size:11px;">{{ venta.repuesto_codigo }}</span>
-              </td>
-              <td class="text-center">
-                <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--text-1);">
-                  {{ venta.cantidad }}
-                </span>
-              </td>
-              <td><span class="eck-price">S/{{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</span></td>
-              <td><span class="eck-price-green">+S/{{ "%.2f"|format(venta.ganancia_total) }}</span></td>
-              <td class="text-end" style="padding-right:20px;">
-                <form action="{{ url_for('main.eliminar_venta', id=venta.id) }}" method="POST"
-                      onsubmit="return confirm('¿Eliminar este registro? No devuelve stock.');" style="display:inline;">
-                  <button type="submit"
-                          style="background:none; border:1px solid transparent; border-radius:var(--radius-sm); padding:4px 8px; color:var(--text-4); cursor:pointer; font-size:13px; transition:all .15s;"
-                          onmouseover="this.style.color='#E8001E'; this.style.background='#FFF1F2'; this.style.borderColor='#FECDD3';"
-                          onmouseout="this.style.color='var(--text-4)'; this.style.background='none'; this.style.borderColor='transparent';">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+<!-- ── FILTROS ── -->
+<div class="eck-card mb-4 no-print" style="padding:16px 20px;">
+  <form method="GET" action="{{ url_for('main.historial_ventas') }}" class="row g-3 align-items-end">
+    <div class="col-md-3">
+      <label style="font-size:12px; font-weight:600; color:var(--text-3); margin-bottom:6px;">Buscar Producto/Código</label>
+      <input type="text" name="q" class="form-control eck-input" placeholder="Ej. Rodaje..." value="{{ q }}">
+    </div>
+    <div class="col-md-3">
+      <label style="font-size:12px; font-weight:600; color:var(--text-3); margin-bottom:6px;">Fecha Inicio</label>
+      <input type="date" name="start_date" class="form-control eck-input" value="{{ start_date }}">
+    </div>
+    <div class="col-md-3">
+      <label style="font-size:12px; font-weight:600; color:var(--text-3); margin-bottom:6px;">Fecha Fin</label>
+      <input type="date" name="end_date" class="form-control eck-input" value="{{ end_date }}">
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+      <button type="submit" class="btn" style="background:var(--primary); color:#fff; font-size:13px; font-weight:600; border-radius:6px; flex:1;">
+        <i class="bi bi-filter"></i> Filtrar
+      </button>
+      <a href="{{ url_for('main.historial_ventas') }}" class="btn" style="background:var(--bg-subtle); color:var(--text-2); border:1px solid var(--border); font-size:13px; border-radius:6px;" title="Limpiar Filtros">
+        <i class="bi bi-x-lg"></i>
+      </a>
+    </div>
+  </form>
+</div>
+
+<div id="printable-area">
+  <!-- ── KPIs superiores ── -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      <div class="eck-kpi">
+        <div class="eck-kpi-label">Ganancia Total (Neta)</div>
+        <div class="eck-kpi-value mono" style="color:#059669; font-size:20px;">S/{{ "%.2f"|format(total_ganancia_global) }}</div>
+        <div class="eck-kpi-sub">Ganancia generada</div>
+        <i class="bi bi-graph-up-arrow eck-kpi-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="eck-kpi">
+        <div class="eck-kpi-label">Costo de Mercadería</div>
+        <div class="eck-kpi-value mono" style="color:#E8001E; font-size:20px;">S/{{ "%.2f"|format(total_costo) }}</div>
+        <div class="eck-kpi-sub">Costo de los repuestos vendidos</div>
+        <i class="bi bi-box-seam eck-kpi-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="eck-kpi">
+        <div class="eck-kpi-label">Ventas Realizadas</div>
+        <div class="eck-kpi-value">{{ total_ventas_count }}</div>
+        <div class="eck-kpi-sub">Transacciones encontradas</div>
+        <i class="bi bi-receipt eck-kpi-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="eck-kpi">
+        <div class="eck-kpi-label">Ingresos Hoy</div>
+        <div class="eck-kpi-value mono" style="font-size:20px; color:#1D4ED8;">S/{{ "%.2f"|format(ing_hoy) }}</div>
+        <div class="eck-kpi-sub">
+          {% if crecimiento_hoy != 0 %}
+            <span style="color:{{ '#059669' if crecimiento_hoy >= 0 else 'var(--red)' }}">
+              {{ '+' if crecimiento_hoy >= 0 }}{{ crecimiento_hoy }}% vs ayer
+            </span>
+          {% else %}
+            vs ayer: S/{{ "%.2f"|format(ing_ayer) }}
+          {% endif %}
+        </div>
+        <i class="bi bi-calendar-day eck-kpi-icon"></i>
       </div>
     </div>
   </div>
-  {% else %}
-  <div style="text-align:center; padding:60px 20px;">
-    <div style="width:64px; height:64px; background:var(--bg-subtle); border:1px solid var(--border); border-radius:18px; display:inline-flex; align-items:center; justify-content:center; font-size:26px; color:var(--text-4); margin-bottom:16px;">
-      <i class="bi bi-graph-up"></i>
-    </div>
-    <h3 style="font-size:17px; font-weight:700; color:var(--text-1); margin-bottom:8px;">Sin ventas registradas</h3>
-    <p style="font-size:13.5px; color:var(--text-3);">Las ventas aparecerán aquí una vez registradas desde el inventario.</p>
-  </div>
-  {% endfor %}
-</div>
 
+  <div class="row g-3 mb-4">
+    <!-- Tendencia de Ventas Diarias -->
+    <div class="col-lg-8">
+      <div class="eck-card">
+        <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border);">
+          <div style="font-size:13px; font-weight:700; color:var(--text-1);">Tendencia de Ventas (Diarias)</div>
+          <div style="font-size:11.5px; color:var(--text-4);">Ganancia generada por día</div>
+        </div>
+        <div style="padding:18px 20px; height:260px;">
+          <canvas id="lineChart" style="height:100% !important;"></canvas>
+        </div>
+      </div>
+    </div>
+    <!-- Producto Estrella -->
+    <div class="col-lg-4">
+      <div class="eck-card h-100 d-flex flex-column">
+        <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border);">
+          <div style="font-size:13px; font-weight:700; color:var(--text-1);">Producto Estrella</div>
+          <div style="font-size:11.5px; color:var(--text-4);">El más vendido en este periodo</div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
+          {% if producto_estrella %}
+            <div style="width:70px; height:70px; background:#FEF3C7; color:#D97706; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; margin-bottom:15px;">
+              <i class="bi bi-star-fill"></i>
+            </div>
+            <h4 style="font-size:16px; font-weight:700; color:var(--text-1); margin:0;">{{ producto_estrella.repuesto_nombre }}</h4>
+            <div style="font-size:13px; color:var(--text-3); margin-top:5px;">
+              <span style="font-weight:700; color:#059669;">{{ producto_estrella.qty }} uds.</span> vendidas
+            </div>
+            <div style="font-size:13px; color:var(--text-4); margin-top:2px;">
+              Total ganancia: S/{{ "%.2f"|format(producto_estrella.gan) }}
+            </div>
+          {% else %}
+            <div style="color:var(--text-4); font-size:24px; margin-bottom:10px;"><i class="bi bi-inboxes"></i></div>
+            <div style="font-size:13px; color:var(--text-3);">No hay ventas para evaluar</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Gráficos: barras mensuales + donut top productos ── -->
+  <div class="row g-3 mb-4">
+    <!-- Ganancias mensuales -->
+    <div class="col-lg-7">
+      <div class="eck-card">
+        <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border);">
+          <div style="font-size:13px; font-weight:700; color:var(--text-1);">Ganancias Agrupadas por Mes</div>
+          <div style="font-size:11.5px; color:var(--text-4);">Evolución histórica de ganancia neta</div>
+        </div>
+        <div style="padding:18px 20px; height:260px;">
+          <canvas id="ventasChart" style="height:100% !important;"></canvas>
+        </div>
+      </div>
+    </div>
+    <!-- Donut top productos -->
+    <div class="col-lg-5">
+      <div class="eck-card">
+        <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border);">
+          <div style="font-size:13px; font-weight:700; color:var(--text-1);">Top Productos (Unidades)</div>
+          <div style="font-size:11.5px; color:var(--text-4);">Distribución de los más vendidos</div>
+        </div>
+        <div style="padding:16px 20px; height:260px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="topDonutChart" style="height:100% !important;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ranking de productos (barra horizontal) ── -->
+  <div class="eck-card mb-4">
+    <div style="padding:16px 20px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <div style="font-size:13px; font-weight:700; color:var(--text-1);">Ranking de Ganancias por Producto</div>
+        <div style="font-size:11.5px; color:var(--text-4);">Top 8 productos por ganancia neta generada</div>
+      </div>
+    </div>
+    <div style="padding:18px 20px; height:280px;">
+      <canvas id="rankingChart" style="height:100% !important;"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Historial detallado ── -->
+  <div class="no-print" style="font-size:12px; font-weight:700; color:var(--text-4); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">
+    Historial Detallado
+  </div>
+
+  <div id="accordionVentas" class="no-print" style="display:flex; flex-direction:column; gap:8px;">
+    {% for periodo, datos in historial_agrupado.items() %}
+    <div class="eck-card" style="overflow:hidden;">
+      <button class="d-flex align-items-center justify-content-between w-100"
+              type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}"
+              style="background:none; border:none; padding:14px 20px; cursor:pointer; text-align:left; width:100%;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <i class="bi bi-calendar-month" style="color:var(--red); font-size:14px;"></i>
+          <span style="font-size:14px; font-weight:700; color:var(--text-1);">{{ periodo }}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:12px; font-weight:600; color:var(--text-3); background:var(--bg-subtle); border:1px solid var(--border); border-radius:50px; padding:3px 11px;">
+            {{ datos['ventas']|length }} venta{{ 's' if datos['ventas']|length != 1 }}
+          </span>
+          <span style="font-size:12px; font-weight:700; color:#059669; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:50px; padding:3px 11px; font-family:'JetBrains Mono',monospace;">
+            +S/{{ "%.2f"|format(datos['suma_ganancia']) }}
+          </span>
+          <i class="bi bi-chevron-down" style="font-size:11px; color:var(--text-4);"></i>
+        </div>
+      </button>
+
+      <div id="collapse{{ loop.index }}" class="accordion-collapse collapse">
+        <div class="eck-table-wrap" style="border-top:1px solid var(--border); border-radius:0;">
+          <table class="eck-table">
+            <thead>
+              <tr>
+                <th style="padding-left:20px;">Fecha</th>
+                <th>Producto</th>
+                <th class="text-center">Cant.</th>
+                <th>Venta</th>
+                <th>Ganancia</th>
+                <th class="text-end" style="padding-right:20px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for venta in datos['ventas'] %}
+              <tr>
+                <td style="padding-left:20px;">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3);">
+                    {{ venta.fecha.strftime('%d/%m %H:%M') }}
+                  </span>
+                </td>
+                <td>
+                  <div style="font-size:13.5px; font-weight:600; color:var(--text-1); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ venta.repuesto_nombre }}">
+                    {{ venta.repuesto_nombre }}
+                  </div>
+                  <span class="eck-code" style="font-size:11px;">{{ venta.repuesto_codigo }}</span>
+                </td>
+                <td class="text-center">
+                  <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--text-1);">
+                    {{ venta.cantidad }}
+                  </span>
+                </td>
+                <td><span class="eck-price">S/{{ "%.2f"|format(venta.precio_unitario * venta.cantidad) }}</span></td>
+                <td><span class="eck-price-green">+S/{{ "%.2f"|format(venta.ganancia_total) }}</span></td>
+                <td class="text-end" style="padding-right:20px;">
+                  <form action="{{ url_for('main.eliminar_venta', id=venta.id) }}" method="POST"
+                        onsubmit="return confirm('¿Eliminar este registro? No devuelve stock.');" style="display:inline;">
+                    <button type="submit"
+                            style="background:none; border:1px solid transparent; border-radius:var(--radius-sm); padding:4px 8px; color:var(--text-4); cursor:pointer; font-size:13px; transition:all .15s;"
+                            onmouseover="this.style.color='#E8001E'; this.style.background='#FFF1F2'; this.style.borderColor='#FECDD3';"
+                            onmouseout="this.style.color='var(--text-4)'; this.style.background='none'; this.style.borderColor='transparent';">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:60px 20px;">
+      <div style="width:64px; height:64px; background:var(--bg-subtle); border:1px solid var(--border); border-radius:18px; display:inline-flex; align-items:center; justify-content:center; font-size:26px; color:var(--text-4); margin-bottom:16px;">
+        <i class="bi bi-graph-up"></i>
+      </div>
+      <h3 style="font-size:17px; font-weight:700; color:var(--text-1); margin-bottom:8px;">Sin ventas encontradas</h3>
+      <p style="font-size:13.5px; color:var(--text-3);">Prueba ajustando los filtros o registra ventas en el inventario.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 const GRAYS  = ['#E8001E','#F97316','#EAB308','#22C55E','#3B82F6','#8B5CF6','#EC4899','#14B8A6'];
+
+// ── TENDENCIA DIARIA ──
+const lineCtx = document.getElementById('lineChart').getContext('2d');
+new Chart(lineCtx, {
+  type: 'line',
+  data: {
+    labels: {{ line_labels|safe }},
+    datasets:[{ 
+      label:'Ganancia (S/)', data: {{ line_data|safe }},
+      backgroundColor:'rgba(59, 130, 246, 0.10)', borderColor:'#3B82F6',
+      borderWidth:2, pointBackgroundColor:'#3B82F6', pointBorderColor:'#fff',
+      pointRadius:4, pointHoverRadius:6, fill:true, tension:0.3
+    }]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#111827',
+      bodyFont:{family:'JetBrains Mono',size:14,weight:'700'}, padding:12, cornerRadius:10,
+      callbacks:{ label: c=>'  S/'+c.parsed.y.toFixed(2) }
+    }},
+    scales:{
+      y:{ beginAtZero:true, grid:{color:'rgba(0,0,0,0.04)',drawBorder:false},
+          ticks:{font:{family:'JetBrains Mono',size:10}, color:'#9CA3AF', callback:v=>'S/'+v}},
+      x:{ grid:{display:false}, ticks:{font:{family:'Inter',size:11}, color:'#9CA3AF'}}
+    }
+  }
+});
 
 // ── GANANCIAS MENSUALES ──
 const ventasCtx = document.getElementById('ventasChart').getContext('2d');
