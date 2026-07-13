@@ -10,7 +10,7 @@ def create_app():
     app = Flask(__name__)
 
     # --- CONFIGURACIÓN INTELIGENTE ---
-    app.config['SECRET_KEY'] = 'tecnicmaq_secreto_2026'
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tecnicmaq_secreto_2026')
     
     # 1. Buscamos si hay una base de datos en la nube (Render/Supabase)
     database_url = os.environ.get('DATABASE_URL')
