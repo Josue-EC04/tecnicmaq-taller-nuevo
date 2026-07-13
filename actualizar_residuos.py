@@ -7,6 +7,9 @@ Ejecutar una sola vez:
     python actualizar_residuos.py
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from app import create_app
 from app.models import db
 from sqlalchemy import text
