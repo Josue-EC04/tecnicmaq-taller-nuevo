@@ -410,10 +410,17 @@ def gestion_pedido(id, accion):
 def historial_ventas():
     ventas = Venta.query.order_by(Venta.fecha.desc()).all()
 
-    # Ganancias por mes (grafico de barras)
-    ganancias = defaultdict(float)
+    # Ganancias por mes (grafico de barras) — orden cronológico
+    from datetime import timedelta
+    ganancias_raw = defaultdict(float)
     for v in ventas:
-        ganancias[f"{v.fecha.month}-{v.fecha.year}"] += v.ganancia_total
+        key = (v.fecha.year, v.fecha.month)
+        ganancias_raw[key] += v.ganancia_total
+    # Ordenar cronológicamente
+    sorted_keys = sorted(ganancias_raw.keys())
+    meses_es = {1:'Ene',2:'Feb',3:'Mar',4:'Abr',5:'May',6:'Jun',7:'Jul',8:'Ago',9:'Sep',10:'Oct',11:'Nov',12:'Dic'}
+    chart_labels_list = [f"{meses_es[m]}/{str(y)[-2:]}" for y, m in sorted_keys]
+    chart_data_list   = [round(ganancias_raw[k], 2) for k in sorted_keys]
 
     # Historial agrupado por periodo
     historial = defaultdict(lambda: {'ventas': [], 'suma_ganancia': 0})
@@ -434,12 +441,24 @@ def historial_ventas():
     top_prod_gan    = json.dumps([round(float(r.gan), 2)   for r in top_prod_raw])
 
     # Ventas de hoy vs ayer
-    from datetime import timedelta
     hoy  = date.today()
     ayer = hoy - timedelta(days=1)
     ing_hoy  = db.session.query(func.sum(Venta.precio_unitario * Venta.cantidad)).filter(func.date(Venta.fecha) == hoy).scalar()  or 0
     ing_ayer = db.session.query(func.sum(Venta.precio_unitario * Venta.cantidad)).filter(func.date(Venta.fecha) == ayer).scalar() or 0
     gan_hoy  = db.session.query(func.sum(Venta.ganancia_total)).filter(func.date(Venta.fecha) == hoy).scalar()  or 0
+
+    # Ticket promedio (precio promedio por venta)
+    total_ingresos_global = sum(v.precio_unitario * v.cantidad for v in ventas)
+    ticket_promedio = round(total_ingresos_global / len(ventas), 2) if ventas else 0
+
+    # Ingresos esta semana vs semana pasada
+    inicio_semana = hoy - timedelta(days=hoy.weekday())  # lunes actual
+    inicio_sem_pasada = inicio_semana - timedelta(days=7)
+    ing_semana = db.session.query(func.sum(Venta.precio_unitario * Venta.cantidad)).filter(func.date(Venta.fecha) >= inicio_semana).scalar() or 0
+    ing_sem_pasada = db.session.query(func.sum(Venta.precio_unitario * Venta.cantidad)).filter(
+        func.date(Venta.fecha) >= inicio_sem_pasada,
+        func.date(Venta.fecha) < inicio_semana
+    ).scalar() or 0
 
     total_ganancia_global = sum(v.ganancia_total for v in ventas)
 
@@ -447,14 +466,17 @@ def historial_ventas():
         historial_agrupado=historial,
         total_ganancia_global=total_ganancia_global,
         total_ventas_count=len(ventas),
-        chart_labels=json.dumps(list(ganancias.keys())),
-        chart_data=json.dumps(list(ganancias.values())),
+        chart_labels=json.dumps(chart_labels_list),
+        chart_data=json.dumps(chart_data_list),
         top_prod_labels=top_prod_labels,
         top_prod_qty=top_prod_qty,
         top_prod_gan=top_prod_gan,
         ing_hoy=round(float(ing_hoy), 2),
         ing_ayer=round(float(ing_ayer), 2),
         gan_hoy=round(float(gan_hoy), 2),
+        ticket_promedio=ticket_promedio,
+        ing_semana=round(float(ing_semana), 2),
+        ing_sem_pasada=round(float(ing_sem_pasada), 2),
     )
 
 @main.route('/eliminar_venta/<int:id>', methods=['POST'])
