@@ -28,7 +28,7 @@ class Repuesto(db.Model):
     precio = db.Column(db.Float, default=0.0)
     imagen_filename = db.Column(db.String(200), default='default.jpg')
     lote_id = db.Column(db.String(50), nullable=True)
-    pedidos = db.relationship('PedidoCompra', backref='repuesto', lazy=True)
+    pedidos = db.relationship('PedidoCompra', backref='repuesto', lazy=True, cascade="all, delete-orphan")
 
     @property
     def imagen_url(self):
