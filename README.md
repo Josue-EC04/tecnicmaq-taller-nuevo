@@ -156,6 +156,15 @@ python actualizar_residuos.py
 
 ---
 
+## 📝 Documentación y Metodología Ágil
+
+El desarrollo de este sistema se ha guiado por principios de metodologías ágiles (Scrum), asegurando que el producto final esté perfectamente alineado con las necesidades reales del taller. Los documentos clave que respaldan este proceso de ingeniería de software son:
+
+- [**Guía de Entrevista (Levantamiento de Requerimientos)**](./Guia_Entrevista_Tecnicmaq_Eck.md): Entrevista semiestructurada realizada al Product Owner (administrador del taller) para comprender los cuellos de botella del proceso manual.
+- [**Product Backlog**](./PRODUCT_BACKLOG.md): Documento principal que prioriza las funcionalidades, historias de usuario y tareas técnicas derivadas de los requerimientos iniciales.
+
+---
+
 ## 🚀 Guía de Instalación (Entorno de Desarrollo)
 
 ### 1. Clonar el repositorio
@@ -235,6 +244,8 @@ tecnicmaq-taller-nuevo/
 │       ├── directorio.html       # Directorio de proveedores
 │       └── configuracion.html    # Configuración del taller
 │
+├── Guia_Entrevista_Tecnicmaq_Eck.md # Guía de entrevista y requerimientos
+├── PRODUCT_BACKLOG.md            # Backlog del producto (Scrum)
 ├── .env                          # Variables de entorno (⚠️ no subir a git)
 ├── .gitignore                    # Archivos excluidos del repositorio
 ├── requirements.txt              # Dependencias del proyecto
