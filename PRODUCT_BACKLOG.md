@@ -18,6 +18,8 @@ Este backlog documenta el estado consolidado del producto **Tecnicmaq Eck** al c
 2. **🐞 Bugs menores pendientes:** defectos de baja prioridad, conocidos y aceptados, que no bloquean la operación del taller.
 3. **🧊 Ideas de futuras mejoras (Backlog congelado):** iniciativas de valor que quedaron fuera del alcance técnico/presupuestario del proyecto académico original.
 
+> **Nota sobre la numeración de historias de usuario:** los IDs (HU-01, HU-06, etc.) se asignaron en el orden en que cada historia fue identificada e incorporada al backlog durante el levantamiento de requerimientos y el refinamiento progresivo, no en el orden en que fueron implementadas. Por ello, los IDs dentro de cada sprint no son necesariamente consecutivos.
+
 ---
 
 ## ✅ Hecho (Done)
@@ -28,45 +30,45 @@ Este backlog documenta el estado consolidado del producto **Tecnicmaq Eck** al c
 
 | ID | Historia de Usuario | Criterios de aceptación | Estado |
 |:---:|:---|:---|:---:|
-| HU-01 | Como **administrador del taller**, quiero iniciar sesión de forma segura, para acceder únicamente yo (o mi personal autorizado) a la información del negocio. | Autenticación con Flask-Login; contraseñas no expuestas en texto plano; sesión persistente. | ✅ Hecho |
-| HU-02 | Como **Scrum Master**, quiero un script de inicialización de base de datos, para desplegar el entorno de forma reproducible. | `setup_db.py` crea todas las tablas; `crear_admin.py` genera un usuario administrador por defecto. | ✅ Hecho |
-| HU-03 | Como **equipo de desarrollo**, quiero una estructura de proyecto modular (`app/models.py`, `app/routes.py`, `templates/`, `static/`), para facilitar el mantenimiento futuro. | Separación clara de responsabilidades (MVC); documentada en el README. | ✅ Hecho |
+| HU-02 | Como **administrador del taller**, quiero iniciar sesión de forma segura, para acceder únicamente yo (o mi personal autorizado) a la información del negocio. | Autenticación con Flask-Login; contraseñas no expuestas en texto plano; sesión persistente. | ✅ Hecho |
+| HU-10 | Como **Scrum Master**, quiero un script de inicialización de base de datos, para desplegar el entorno de forma reproducible. | `setup_db.py` crea todas las tablas; `crear_admin.py` genera un usuario administrador por defecto. | ✅ Hecho |
+| HU-19 | Como **equipo de desarrollo**, quiero una estructura de proyecto modular (`app/models.py`, `app/routes.py`, `templates/`, `static/`), para facilitar el mantenimiento futuro. | Separación clara de responsabilidades (MVC); documentada en el README. | ✅ Hecho |
 
 ### 📦 Sprint 2 — Módulo de Inventario (repuestos)
 
 | ID | Historia de Usuario | Criterios de aceptación | Estado |
 |:---:|:---|:---|:---:|
-| HU-04 | Como **administrador**, quiero registrar repuestos con código, marca, cantidad, costo y precio de venta, para tener un control preciso de mi almacén. | Formulario de alta/edición; validación de campos obligatorios. | ✅ Hecho |
-| HU-05 | Como **administrador**, quiero un control de lotes con trazabilidad de ingresos, para saber la procedencia y antigüedad del stock disponible. | Registro histórico de movimientos de entrada por repuesto. | ✅ Hecho |
-| HU-06 | Como **administrador**, quiero asociar una imagen a cada repuesto, para identificarlos visualmente en el catálogo. | Carga de imágenes a `app/static/uploads/`; visualización en catálogo. | ✅ Hecho |
-| HU-07 | Como **administrador**, quiero recibir una alerta automática cuando el stock de un repuesto baje del mínimo configurado, para evitar el desabastecimiento. | Notificación visible en el dashboard cuando `cantidad < mínimo`. | ✅ Hecho |
+| HU-01 | Como **administrador**, quiero registrar repuestos con código, marca, cantidad, costo y precio de venta, para tener un control preciso de mi almacén. | Formulario de alta/edición; validación de campos obligatorios. | ✅ Hecho |
+| HU-06 | Como **administrador**, quiero un control de lotes con trazabilidad de ingresos, para saber la procedencia y antigüedad del stock disponible. | Registro histórico de movimientos de entrada por repuesto. | ✅ Hecho |
+| HU-12 | Como **administrador**, quiero asociar una imagen a cada repuesto, para identificarlos visualmente en el catálogo. | Carga de imágenes a `app/static/uploads/`; visualización en catálogo. | ✅ Hecho |
+| HU-15 | Como **administrador**, quiero recibir una alerta automática cuando el stock de un repuesto baje del mínimo configurado, para evitar el desabastecimiento. | Notificación visible en el dashboard cuando `cantidad < mínimo`. | ✅ Hecho |
 
 ### 💰 Sprint 3 — Ventas, Facturación y Pedidos de Compra
 
 | ID | Historia de Usuario | Criterios de aceptación | Estado |
 |:---:|:---|:---|:---:|
-| HU-08 | Como **administrador**, quiero registrar la salida de repuestos utilizados en cada reparación, para mantener un historial completo de ventas. | Registro de salidas vinculado al inventario; descuenta stock automáticamente. | ✅ Hecho |
-| HU-09 | Como **administrador**, quiero que el sistema calcule automáticamente la ganancia neta por repuesto vendido, para tomar decisiones comerciales informadas. | Cálculo instantáneo `precio − costo unitario` mostrado en el reporte. | ✅ Hecho |
-| HU-10 | Como **administrador**, quiero generar órdenes de compra sugeridas para repuestos con stock bajo, para agilizar la planificación de compras. | Generación automática de sugerencias desde el módulo de Inventario. | ✅ Hecho |
-| HU-11 | Como **administrador**, quiero dar seguimiento al estado de cada pedido (Pendiente/Completado) junto con los datos del proveedor, para no perder el control de mis compras en tránsito. | Cambio de estado desde la interfaz; datos de proveedor visibles en el pedido. | ✅ Hecho |
-| HU-12 | Como **administrador**, quiero que el sistema impida registrar un pedido duplicado para un repuesto que ya tiene una orden en tránsito, para evitar compras redundantes. | Bloqueo dinámico de controles en el frontend de "Lista de Compras" ante duplicidad. | ✅ Hecho |
+| HU-04 | Como **administrador**, quiero generar órdenes de compra sugeridas para repuestos con stock bajo, para agilizar la planificación de compras. | Generación automática de sugerencias desde el módulo de Inventario. | ✅ Hecho |
+| HU-05 | Como **administrador**, quiero registrar la salida de repuestos utilizados en cada reparación, para mantener un historial completo de ventas. | Registro de salidas vinculado al inventario; descuenta stock automáticamente. | ✅ Hecho |
+| HU-09 | Como **administrador**, quiero dar seguimiento al estado de cada pedido (Pendiente/Completado) junto con los datos del proveedor, para no perder el control de mis compras en tránsito. | Cambio de estado desde la interfaz; datos de proveedor visibles en el pedido. | ✅ Hecho |
+| HU-13 | Como **administrador**, quiero que el sistema calcule automáticamente la ganancia neta por repuesto vendido, para tomar decisiones comerciales informadas. | Cálculo instantáneo `precio − costo unitario` mostrado en el reporte. | ✅ Hecho |
+| HU-18 | Como **administrador**, quiero que el sistema impida registrar un pedido duplicado para un repuesto que ya tiene una orden en tránsito, para evitar compras redundantes. | Bloqueo dinámico de controles en el frontend de "Lista de Compras" ante duplicidad. | ✅ Hecho |
 
 ### ♻️ Sprint 4 — Gestión de Residuos y Economía Circular
 
 | ID | Historia de Usuario | Criterios de aceptación | Estado |
 |:---:|:---|:---|:---:|
-| HU-13 | Como **administrador**, quiero clasificar los residuos generados (Eléctrico, Mecánico, Hidráulico, Químico, Otro), para asegurar su trazabilidad ambiental. | Formulario de registro con categoría, nombre, cantidad, peso y origen. | ✅ Hecho |
-| HU-14 | Como **administrador**, quiero dar seguimiento al ciclo de vida de un residuo (Acumulado → En búsqueda → Derivado/Desechado), para conocer su estado en todo momento. | Cambio de estado disponible desde la vista de residuos. | ✅ Hecho |
-| HU-15 | Como **administrador**, quiero registrar el peso y la ganancia obtenida al vender chatarra a un centro de reciclaje, para monetizar el excedente del taller. | Campos de peso (kg) y ganancia; visibles en el registro del residuo. | ✅ Hecho |
+| HU-07 | Como **administrador**, quiero dar seguimiento al ciclo de vida de un residuo (Acumulado → En búsqueda → Derivado/Desechado), para conocer su estado en todo momento. | Cambio de estado disponible desde la vista de residuos. | ✅ Hecho |
+| HU-08 | Como **administrador**, quiero clasificar los residuos generados (Eléctrico, Mecánico, Hidráulico, Químico, Otro), para asegurar su trazabilidad ambiental. | Formulario de registro con categoría, nombre, cantidad, peso y origen. | ✅ Hecho |
+| HU-17 | Como **administrador**, quiero registrar el peso y la ganancia obtenida al vender chatarra a un centro de reciclaje, para monetizar el excedente del taller. | Campos de peso (kg) y ganancia; visibles en el registro del residuo. | ✅ Hecho |
 
 ### 📞 Sprint 5 — Directorio de Proveedores e integración final
 
 | ID | Historia de Usuario | Criterios de aceptación | Estado |
 |:---:|:---|:---|:---:|
-| HU-16 | Como **administrador**, quiero un directorio con los datos de contacto, horarios y categoría de cada proveedor, para localizarlos rápidamente ante escasez de un repuesto. | Alta/consulta de proveedores; búsqueda por tipo de repuesto comercializado. | ✅ Hecho |
-| HU-17 | Como **administrador**, quiero visualizar la ubicación exacta de cada proveedor en un mapa, para planificar mejor mis desplazamientos de compra. | Integración con enlaces de Google Maps a partir de coordenadas registradas. | ✅ Hecho |
-| HU-18 | Como **equipo de desarrollo**, quiero que las operaciones del taller (altas, bajas, ediciones) se procesen sin recargar el navegador, para ofrecer una experiencia fluida al usuario. | Peticiones asíncronas (AJAX) implementadas en los módulos críticos. | ✅ Hecho |
-| HU-19 | Como **Product Owner**, quiero que el sistema esté disponible en un backend en la nube, para acceder a la información del taller desde cualquier lugar. | Integración con Supabase como backend as a service; PostgreSQL en producción. | ✅ Hecho |
+| HU-03 | Como **administrador**, quiero un directorio con los datos de contacto, horarios y categoría de cada proveedor, para localizarlos rápidamente ante escasez de un repuesto. | Alta/consulta de proveedores; búsqueda por tipo de repuesto comercializado. | ✅ Hecho |
+| HU-11 | Como **administrador**, quiero visualizar la ubicación exacta de cada proveedor en un mapa, para planificar mejor mis desplazamientos de compra. | Integración con enlaces de Google Maps a partir de coordenadas registradas. | ✅ Hecho |
+| HU-14 | Como **Product Owner**, quiero que el sistema esté disponible en un backend en la nube, para acceder a la información del taller desde cualquier lugar. | Integración con Supabase como backend as a service; PostgreSQL en producción. | ✅ Hecho |
+| HU-16 | Como **equipo de desarrollo**, quiero que las operaciones del taller (altas, bajas, ediciones) se procesen sin recargar el navegador, para ofrecer una experiencia fluida al usuario. | Peticiones asíncronas (AJAX) implementadas en los módulos críticos. | ✅ Hecho |
 
 ### 🛠️ Fase de mantenimiento — v2.0.0 (cumplimiento ambiental)
 
