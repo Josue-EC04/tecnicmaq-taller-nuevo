@@ -272,7 +272,12 @@ def editar(id):
     except: pass
     
     filename = guardar_imagen(request.files.get('imagen'))
-    if filename: r.imagen_filename = filename
+    quitar_imagen = request.form.get('quitar_imagen') == 'on'
+    
+    if filename:
+        r.imagen_filename = filename
+    elif quitar_imagen:
+        r.imagen_filename = 'default.jpg'
     
     db.session.commit()
     flash('Actualizado.', 'success')
