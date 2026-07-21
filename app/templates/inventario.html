@@ -240,7 +240,7 @@
 
 {% block extra_scripts %}
 <script>
-let estadoActual = { q: "{{ busqueda }}", orden: "{{ orden_actual }}", page: 1 };
+let estadoActual = { q: "{{ busqueda }}", orden: "{{ orden_actual }}", page: {{ pagination.page if pagination else 1 }} };
 
 function cargarInventario(params) {
   estadoActual = { ...estadoActual, ...params };
@@ -283,7 +283,7 @@ window.cambiarOrden = function (orden, texto) {
 };
 
 function conectarPaginacion() {
-  document.querySelectorAll('.page-link').forEach(link => {
+  document.querySelectorAll('.eck-page-btn').forEach(link => {
     link.addEventListener('click', function (e) {
       e.preventDefault();
       const href = this.getAttribute('href');
